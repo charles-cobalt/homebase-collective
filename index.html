@@ -29,6 +29,8 @@ body{
   background:
     radial-gradient(130% 95% at 50% 26%, #fbfaf7 0%, var(--ghosted) 58%, #d8d3cc 100%);
   font-family:'Mulish',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
   color:var(--diesel);
   overflow:hidden;
 }
@@ -39,11 +41,12 @@ body{
 .mark{
   width:min(66vw,300px);
   margin:0 auto;
-  animation:rise 1.5s cubic-bezier(.22,.75,.25,1) both .15s;
+  animation:rise 1.5s cubic-bezier(.22,.75,.25,1) backwards .15s;
 }
 .mark svg{display:block;width:100%;height:auto}
 .arc{
   font-family:'Noto Serif Display',serif;
+  font-weight:500;
   font-size:14px;
   letter-spacing:.24em;
   fill:var(--morel);
@@ -51,12 +54,13 @@ body{
 .arc-b{letter-spacing:.52em}
 .mono{
   font-family:'Noto Serif Display',serif;
+  font-weight:500;
   font-size:46px;
   letter-spacing:0;
   fill:var(--morel);
 }
 .rule{stroke:var(--morel);stroke-width:1.1}
-.stage{position:relative;transform:translateY(-6vh)}
+.stage{position:relative;top:-6vh}
 .reflection{
   position:absolute;
   top:calc(100% + 10px);
@@ -66,7 +70,7 @@ body{
   -webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.24), rgba(0,0,0,0) 52%);
   mask-image:linear-gradient(to bottom, rgba(0,0,0,.24), rgba(0,0,0,0) 52%);
   pointer-events:none;
-  animation:rise 1.5s cubic-bezier(.22,.75,.25,1) both .3s;
+  animation:rise 1.5s cubic-bezier(.22,.75,.25,1) backwards .3s;
 }
 @keyframes rise{
   from{opacity:0;transform:translateY(16px)}
@@ -85,7 +89,7 @@ body{
 <body>
 <main class="stage">
   <div class="mark" role="img" aria-label="The Home Base Collective">
-    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
       <defs>
         <path id="hb-top" d="M 36.5,100 A 63.5,63.5 0 0 1 163.5,100" fill="none"/>
         <path id="hb-bot" d="M 29.3,100 A 70.7,70.7 0 0 0 170.7,100" fill="none"/>
@@ -98,7 +102,7 @@ body{
     </svg>
   </div>
   <div class="reflection" aria-hidden="true">
-    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
       <defs>
         <path id="hb-top-r" d="M 36.5,100 A 63.5,63.5 0 0 1 163.5,100" fill="none"/>
         <path id="hb-bot-r" d="M 29.3,100 A 70.7,70.7 0 0 0 170.7,100" fill="none"/>
