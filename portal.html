@@ -93,6 +93,9 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
 .stage-view p.body{margin-top:26px;font-size:clamp(16px,2.6vw,20px);line-height:1.7;color:var(--morel);max-width:640px;font-family:'Noto Serif Display',serif;font-style:italic}
 .stage-view .count{position:absolute;bottom:26px;font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:.3em;color:var(--morel)}
 .stage-view .leave{position:absolute;top:20px;right:22px}
+.stage-view{overflow:auto}
+.stagevideo{position:absolute;left:0;right:0;bottom:46px;padding:0 18px;text-align:center}
+.stagevideo iframe, .vbox iframe{width:100%;max-width:640px;aspect-ratio:16/10;border:1px solid rgba(111,99,89,.35);background:#141210;display:block;margin:10px auto 0}
 .slideedit{border:1px solid rgba(111,99,89,.3);padding:16px;margin-bottom:12px;background:rgba(255,255,255,.5)}
 .presentbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0}
 .note{font-size:12.5px;color:var(--morel);line-height:1.6}
@@ -125,6 +128,10 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
   <!-- AUTH -->
   <section id="auth" class="auth hidden">
     <p class="caps">Member portal</p>
+    <div class="tabs" id="loginTabs" style="margin:0 0 20px">
+      <button data-login="client" class="on">Client</button>
+      <button data-login="studio">Studio</button>
+    </div>
     <h1 id="authTitle">Welcome home</h1>
     <div id="nameField" class="field hidden">
       <label for="name">Full name</label>
@@ -178,6 +185,10 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
   <h1 id="svTitle"></h1>
   <p class="body" id="svBody"></p>
   <div class="count" id="svCount"></div>
+  <div class="stagevideo">
+    <button class="ghost" id="svVideoBtn">Join video room</button>
+    <div id="svVideoBox" class="hidden"><iframe id="svVideoFrame" title="Video room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div>
+  </div>
 </div>
 
 <script type="module">
@@ -199,6 +210,25 @@ const hide = id => $(id).classList.add('hidden');
 let me = null, myProfile = null, myCase = null, unsub = [];
 
 /* ---------- auth ---------- */
+let loginAs = 'client';
+$('loginTabs').onclick = e => {
+  if (!e.target.dataset.login) return;
+  loginAs = e.target.dataset.login;
+  document.querySelectorAll('#loginTabs button').forEach(b => b.classList.toggle('on', b===e.target));
+  signupMode = false;
+  $('nameField').classList.add('hidden');
+  $('authErr').textContent = '';
+  if (loginAs === 'studio') {
+    $('authTitle').textContent = 'Studio sign in';
+    $('authGo').textContent = 'Sign in';
+    $('authSwap').classList.add('hidden');
+  } else {
+    $('authTitle').textContent = 'Welcome home';
+    $('authGo').textContent = 'Sign in';
+    $('authSwap').classList.remove('hidden');
+    $('authSwap').textContent = 'New here? Create your profile';
+  }
+};
 let signupMode = false;
 $('authSwap').onclick = () => {
   signupMode = !signupMode;
@@ -372,7 +402,10 @@ function renderMaterials(el, caseId, canUpload) {
       const f = e.target.files[0]; if (!f) return;
       if (f.size > 8*1024*1024) { $('upNote').textContent = 'Keep files under 8 MB for now.'; return; }
       $('upNote').textContent = 'Uploading...';
-      const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+      const b64 = btoa(bin);
       await addDoc(collection(db, 'cases', caseId, 'uploads'), {
         name: f.name, type: f.type, size: f.size,
         uploadedBy: me.uid, uploadedByName: myProfile.name, createdAt: serverTimestamp()
@@ -409,10 +442,21 @@ function startClient() {
 }
 
 /* ---------- live presentation viewer ---------- */
+let stageCaseId = null;
+function stopStageVideo() {
+  const f = $('svVideoFrame'); if (f) f.src = 'about:blank';
+  hide('svVideoBox'); show('svVideoBtn');
+}
+$('svVideoBtn').onclick = () => {
+  if (!stageCaseId) return;
+  $('svVideoFrame').src = 'https://meet.jit.si/homebase-collective-' + stageCaseId;
+  show('svVideoBox'); hide('svVideoBtn');
+};
 function watchRoom(caseId, isAdminView) {
+  stageCaseId = caseId;
   unsub.push(onSnapshot(doc(db, 'rooms', caseId), async snap => {
     const room = snap.exists() ? snap.data() : null;
-    if (!room || !room.active || !room.presentationId) { if (!isAdminView) hide('stageView'); return; }
+    if (!room || !room.active || !room.presentationId) { if (!isAdminView) { stopStageVideo(); hide('stageView'); } return; }
     const pres = (await getDoc(doc(db, 'presentations', room.presentationId))).data();
     const slides = (await getDocs(query(collection(db, 'presentations', room.presentationId, 'slides'), orderBy('idx','asc')))).docs.map(d=>d.data());
     if (!slides.length) return;
@@ -424,7 +468,7 @@ function watchRoom(caseId, isAdminView) {
     if (!isAdminView) show('stageView');
   }));
 }
-$('leaveStage').onclick = () => hide('stageView');
+$('leaveStage').onclick = () => { stopStageVideo(); hide('stageView'); };
 
 /* ---------- admin ---------- */
 let adminCase = null;
@@ -564,7 +608,9 @@ async function renderSlidesAdmin(el, clientId, caseId) {
           <button data-prev="${p.id}">&larr; Prev</button>
           <span class="caps" id="livepos"></span>
           <button data-next="${p.id}">Next &rarr;</button>
-        </div>` : ''}
+        </div>
+        <div style="margin-top:4px"><button class="ghost" data-video="1">Open video room</button>
+          <div id="vbox-${p.id}" class="vbox hidden"><iframe title="Video room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div></div>` : ''}
     </div>`;
   }
   html += `<div class="slideedit">
@@ -606,6 +652,15 @@ async function renderSlidesAdmin(el, clientId, caseId) {
   el.querySelectorAll('[data-end]').forEach(b => b.onclick = async () => {
     await setDoc(doc(db,'rooms',caseId), { active: false, presentationId: null, currentSlide: 0, updatedAt: serverTimestamp() });
     renderSlidesAdmin(el, clientId, caseId);
+  });
+  el.querySelectorAll('[data-video]').forEach(b => b.onclick = () => {
+    const box = b.parentElement.querySelector('.vbox'); const frame = box.querySelector('iframe');
+    if (box.classList.contains('hidden')) {
+      frame.src = 'https://meet.jit.si/homebase-collective-' + caseId;
+      box.classList.remove('hidden'); b.textContent = 'Close video room';
+    } else {
+      frame.src = 'about:blank'; box.classList.add('hidden'); b.textContent = 'Open video room';
+    }
   });
   el.querySelectorAll('[data-prev]').forEach(b => b.onclick = async () => {
     const r = (await getDoc(doc(db,'rooms',caseId))).data();
