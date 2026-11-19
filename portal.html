@@ -435,7 +435,9 @@ async function renderSlidesAdmin(el, clientId, caseId) {
       <div class="row" style="border:none;padding:0 0 10px"><div class="t serif" style="font-size:19px">${esc(p.title)}</div>
         <div class="acts">${live ? `<button class="solid" data-end="${p.id}">End presentation</button>` : `<button data-live="${p.id}">Present live</button>`}</div></div>
       ${slides.map((s,i)=>`<div class="note" style="padding:7px 0;border-top:1px solid rgba(111,99,89,.15)">${i+1}. <b>${esc(s.title||'')}</b>${s.body?' — '+esc(s.body.slice(0,90)):''}</div>`).join('')}
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <div style="margin-top:12px">
+        <div class="field"><label for="st-${p.id}">New slide title</label><input id="st-${p.id}" placeholder="e.g. The living room"></div>
+        <div class="field"><label for="sb-${p.id}">Slide text (optional)</label><textarea id="sb-${p.id}" rows="2" placeholder="A sentence or two for this slide"></textarea></div>
         <button class="ghost" data-addslide="${p.id}">+ Add slide</button>
       </div>
       ${live ? `<div class="presentbar">
@@ -459,9 +461,9 @@ async function renderSlidesAdmin(el, clientId, caseId) {
   };
   el.querySelectorAll('[data-addslide]').forEach(b => b.onclick = async () => {
     const pid = b.dataset.addslide;
+    const title = $('st-'+pid).value.trim(); if (!title) { $('st-'+pid).focus(); return; }
+    const body = $('sb-'+pid).value.trim();
     const slides = (await getDocs(collection(db,'presentations',pid,'slides'))).size;
-    const title = prompt('Slide title:'); if (title === null) return;
-    const body = prompt('Slide text (optional):') || '';
     await addDoc(collection(db,'presentations',pid,'slides'), { idx: slides, title, body });
     renderSlidesAdmin(el, clientId, caseId);
   });
