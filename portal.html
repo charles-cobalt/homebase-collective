@@ -119,6 +119,14 @@ body.night.reflect{background:#1a1411}
 .stage-view .leave{position:absolute;top:20px;right:22px}
 .stage-view{overflow:auto}
 .stagevideo{position:absolute;left:0;right:0;bottom:46px;padding:0 18px;text-align:center}
+#callChat{position:fixed;top:0;right:0;bottom:0;width:min(370px,94vw);z-index:70;display:flex;flex-direction:column;
+  background:#fbfaf7;border-left:1px solid rgba(111,99,89,.3);box-shadow:-18px 0 40px rgba(34,25,19,.12);text-align:left}
+body.night #callChat{background:#1a1411;border-left-color:rgba(181,170,158,.35)}
+#ccHead{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;border-bottom:1px solid rgba(111,99,89,.18)}
+body.night #ccHead{border-bottom-color:rgba(181,170,158,.25)}
+#ccBody{flex:1;overflow-y:auto;padding:12px 14px 6px}
+#callChat .chatbox{padding:0 14px calc(12px + env(safe-area-inset-bottom,0px));margin-top:0}
+#ccClose{padding:2px 10px;font-size:15px}
 .stagevideo iframe, .vbox iframe{width:100%;max-width:640px;aspect-ratio:16/10;border:1px solid rgba(111,99,89,.35);background:#141210;display:block;margin:10px auto 0}
 .slideedit{border:1px solid rgba(111,99,89,.3);padding:16px;margin-bottom:12px;background:rgba(255,255,255,.5)}
 .presentbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0}
@@ -221,6 +229,7 @@ body.night.reflect{background:#1a1411}
 <!-- LIVE PRESENTATION VIEWER -->
 <div id="stageView" class="stage-view hidden">
   <button class="ghost leave" id="leaveStage">Leave</button>
+  <button class="ghost" id="svChatBtn" style="position:absolute;top:20px;right:104px">Chat</button>
   <p class="caps kicker" id="svKicker"></p>
   <h1 id="svTitle"></h1>
   <p class="body" id="svBody"></p>
@@ -231,6 +240,11 @@ body.night.reflect{background:#1a1411}
     <button class="ghost" id="svAudioBtn">Join audio only</button>
     <div id="svVideoBox" class="hidden"><iframe id="svVideoFrame" title="Meeting room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div>
   </div>
+</div>
+
+<div id="callChat" class="hidden">
+  <div id="ccHead"><span class="caps">Reflection</span><button class="ghost" id="ccClose" title="Close chat">&times;</button></div>
+  <div id="ccBody"></div>
 </div>
 
 <script type="module">
@@ -311,7 +325,7 @@ onAuthStateChanged(auth, async user => {
   unsub.forEach(u => u()); unsub = [];
   me = user;
   ['auth','client','admin'].forEach(hide);
-  if (!user) { document.body.classList.remove('reflect'); show('auth'); hide('gearBtn'); hide('gearMenu'); return; }
+  if (!user) { document.body.classList.remove('reflect'); show('auth'); hide('gearBtn'); hide('gearMenu'); hide('callChat'); callChatCase = null; return; }
   myProfile = (await getDoc(doc(db, 'users', user.uid))).data() || { name: user.email, role: 'client' };
   $('gmName').textContent = myProfile.name || '';
   $('gmEmail').textContent = user.email || '';
@@ -322,11 +336,12 @@ onAuthStateChanged(auth, async user => {
 });
 
 /* ---------- chat (shared) ---------- */
-function renderChat(el, caseId, phase, canPost) {
-  el.innerHTML = `<div class="chatlog" id="log-${phase}"><div class="spin">Listening...</div></div>
-    ${canPost ? `<div class="chatbox"><input id="in-${phase}" placeholder="Write a note..." autocomplete="off"><button class="ghost" id="att-${phase}" title="Send a photo or document">Attach</button><button class="solid" id="send-${phase}">Send</button></div>
-    <input type="file" id="attfile-${phase}" class="hidden"><div class="note" id="attnote-${phase}"></div>` : ''}`;
-  const log = $(`log-${phase}`);
+function renderChat(el, caseId, phase, canPost, suffix) {
+  suffix = suffix || '';
+  el.innerHTML = `<div class="chatlog" id="log-${phase}${suffix}"><div class="spin">Listening...</div></div>
+    ${canPost ? `<div class="chatbox"><input id="in-${phase}${suffix}" placeholder="Write a note..." autocomplete="off"><button class="ghost" id="att-${phase}${suffix}" title="Send a photo or document">Attach</button><button class="solid" id="send-${phase}${suffix}">Send</button></div>
+    <input type="file" id="attfile-${phase}${suffix}" class="hidden"><div class="note" id="attnote-${phase}${suffix}"></div>` : ''}`;
+  const log = $(`log-${phase}${suffix}`);
   unsub.push(onSnapshot(
     query(collection(db, 'cases', caseId, 'messages'), where('phase','==',phase), orderBy('createdAt','asc')),
     snap => {
@@ -346,18 +361,18 @@ function renderChat(el, caseId, phase, canPost) {
     }));
   if (canPost) {
     const send = async () => {
-      const inp = $(`in-${phase}`); const body = inp.value.trim(); if (!body) return;
+      const inp = $(`in-${phase}${suffix}`); const body = inp.value.trim(); if (!body) return;
       inp.value = '';
       await addDoc(collection(db, 'cases', caseId, 'messages'), {
         phase, body, senderId: me.uid, senderName: myProfile.name, createdAt: serverTimestamp()
       });
     };
-    $(`send-${phase}`).onclick = send;
-    $(`in-${phase}`).addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
-    $(`att-${phase}`).onclick = () => $(`attfile-${phase}`).click();
-    $(`attfile-${phase}`).onchange = async e => {
+    $(`send-${phase}${suffix}`).onclick = send;
+    $(`in-${phase}${suffix}`).addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+    $(`att-${phase}${suffix}`).onclick = () => $(`attfile-${phase}${suffix}`).click();
+    $(`attfile-${phase}${suffix}`).onchange = async e => {
       const f = e.target.files[0]; if (!f) return;
-      const note = $(`attnote-${phase}`);
+      const note = $(`attnote-${phase}${suffix}`);
       if (f.size > 8*1024*1024) { note.textContent = 'Keep files under 8 MB for now.'; return; }
       note.textContent = `Reading ${f.name}...`;
       try {
@@ -519,6 +534,17 @@ function startClient() {
   };
 }
 
+/* ---------- in-call chat (reflection alongside the meeting) ---------- */
+let callChatCase = null;
+function openCallChat(caseId) {
+  if (callChatCase !== caseId) {
+    callChatCase = caseId;
+    renderChat($('ccBody'), caseId, 'reflection', true, '-call');
+  }
+  show('callChat');
+}
+$('ccClose').onclick = () => hide('callChat');
+
 /* ---------- live presentation viewer ---------- */
 let stageCaseId = null;
 function stopStageVideo() {
@@ -582,7 +608,8 @@ function watchRoom(caseId, isAdminView) {
     if (!isAdminView) show('stageView');
   }));
 }
-$('leaveStage').onclick = () => { stopStageVideo(); hide('stageView'); };
+$('svChatBtn').onclick = () => openCallChat(stageCaseId);
+$('leaveStage').onclick = () => { stopStageVideo(); hide('stageView'); hide('callChat'); };
 
 /* ---------- admin ---------- */
 let adminCase = null;
@@ -791,6 +818,7 @@ async function renderSlidesAdmin(el, clientId, caseId) {
           <button data-prev="${p.id}">&larr; Prev</button>
           <span class="caps" id="livepos"></span>
           <button data-next="${p.id}">Next &rarr;</button>
+          <button class="ghost" data-callchat="1">Chat</button>
         </div>
         <div style="margin-top:4px"><button class="ghost" data-video="1">Open meeting room</button>
           <div id="vbox-${p.id}" class="vbox hidden"><iframe title="Meeting room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div></div>` : ''}
@@ -866,6 +894,7 @@ async function renderSlidesAdmin(el, clientId, caseId) {
     await setDoc(doc(db,'rooms',caseId), { active: false, presentationId: null, currentSlide: 0, updatedAt: serverTimestamp() });
     renderSlidesAdmin(el, clientId, caseId);
   });
+  el.querySelectorAll('[data-callchat]').forEach(b => b.onclick = () => openCallChat(caseId));
   el.querySelectorAll('[data-video]').forEach(b => b.onclick = async () => {
     const box = b.parentElement.querySelector('.vbox'); const frame = box.querySelector('iframe');
     if (box.classList.contains('hidden')) {
