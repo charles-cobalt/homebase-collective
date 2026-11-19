@@ -160,6 +160,7 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
     <p class="caps">Your case</p>
     <h1 id="clientTitle" style="font-size:28px;margin:8px 0 6px"></h1>
     <p class="note" id="clientSub"></p>
+    <div id="clientCasePicker" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px"></div>
     <div class="tabs" id="clientTabs">
       <button data-tab="reflection" class="on">Reflection</button>
       <button data-tab="materials">Materials</button>
@@ -192,6 +193,7 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
   <p class="caps kicker" id="svKicker"></p>
   <h1 id="svTitle"></h1>
   <p class="body" id="svBody"></p>
+  <div id="svMedia" style="margin:14px auto 0;max-width:640px"></div>
   <div class="count" id="svCount"></div>
   <div class="stagevideo">
     <button class="ghost" id="svVideoBtn">Join meeting room</button>
@@ -287,6 +289,7 @@ function renderChat(el, caseId, phase, canPost) {
   unsub.push(onSnapshot(
     query(collection(db, 'cases', caseId, 'messages'), where('phase','==',phase), orderBy('createdAt','asc')),
     snap => {
+      if (window.__activeCase && window.__activeCase !== caseId) return;
       if (snap.empty) { log.innerHTML = `<div class="empty">${phase==='reflection' ? 'The reflection room is quiet for now.' : 'Nothing here yet.'}</div>`; return; }
       log.innerHTML = snap.docs.map(d => {
         const m = d.data();
@@ -428,6 +431,13 @@ function renderMaterials(el, caseId, canUpload) {
 }
 
 /* ---------- client ---------- */
+function renderClientCase() {
+  $('clientTitle').textContent = myCase.title || 'Your case';
+  $('clientSub').textContent = myCase.status ? `Status: ${myCase.status}` : '';
+  renderChat($('ctab-reflection'), myCase.id, 'reflection', true);
+  renderMaterials($('ctab-materials'), myCase.id, false);
+  watchRoom(myCase.id, false);
+}
 function startClient() {
   show('client');
   $('clientTitle').textContent = 'Finding your space...';
@@ -438,12 +448,18 @@ function startClient() {
       $('ctab-reflection').innerHTML = ''; $('ctab-materials').innerHTML='';
       return;
     }
-    myCase = { id: snap.docs[0].id, ...snap.docs[0].data() };
-    $('clientTitle').textContent = myCase.title || 'Your case';
-    $('clientSub').textContent = myCase.status ? `Status: ${myCase.status}` : '';
-    renderChat($('ctab-reflection'), myCase.id, 'reflection', true);
-    renderMaterials($('ctab-materials'), myCase.id, false);
-    watchRoom(myCase.id, false);
+    const cases = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!myCase || !cases.some(c => c.id === myCase.id)) myCase = cases[0];
+    window.__activeCase = myCase.id;
+    const picker = $('clientCasePicker');
+    if (picker) {
+      if (cases.length > 1) {
+        picker.innerHTML = cases.map(c => `<button class="ghost" data-case="${c.id}" style="padding:4px 12px;font-size:11px;${c.id===myCase.id?'border-color:var(--morel);font-weight:700;':''}">${esc(c.title||'Case')}</button>`).join(' ');
+        picker.classList.remove('hidden');
+        picker.querySelectorAll('[data-case]').forEach(b => b.onclick = () => { myCase = cases.find(c=>c.id===b.dataset.case); window.__activeCase = myCase.id; renderClientCase(); });
+      } else picker.classList.add('hidden');
+    }
+    renderClientCase();
   }));
   $('clientTabs').onclick = e => {
     if (!e.target.dataset.tab) return;
@@ -493,16 +509,25 @@ $('svAudioBtn').onclick = () => joinStageMeeting(true);
 function watchRoom(caseId, isAdminView) {
   stageCaseId = caseId;
   unsub.push(onSnapshot(doc(db, 'rooms', caseId), async snap => {
+    if (window.__activeCase && window.__activeCase !== caseId) return;
     const room = snap.exists() ? snap.data() : null;
     if (!room || !room.active || !room.presentationId) { if (!isAdminView) { stopStageVideo(); hide('stageView'); } return; }
     const pres = (await getDoc(doc(db, 'presentations', room.presentationId))).data();
-    const slides = (await getDocs(query(collection(db, 'presentations', room.presentationId, 'slides'), orderBy('idx','asc')))).docs.map(d=>d.data());
+    const slides = (await getDocs(query(collection(db, 'presentations', room.presentationId, 'slides'), orderBy('idx','asc')))).docs.map(d=>({id:d.id,...d.data()}));
     if (!slides.length) return;
     const i = Math.min(room.currentSlide||0, slides.length-1);
     $('svKicker').textContent = pres.title || 'Presentation';
     $('svTitle').textContent = slides[i].title || '';
     $('svBody').textContent = slides[i].body || '';
     $('svCount').textContent = `${i+1} / ${slides.length}`;
+    const smb = $('svMedia'); smb.innerHTML = '';
+    const sm = slides[i].media;
+    if (sm && sm.mime) {
+      const url = await assembleUrl(collection(db, 'presentations', room.presentationId, 'slides', slides[i].id, 'chunks'), sm.mime);
+      if (sm.type === 'image') smb.innerHTML = `<img src="${url}" alt="" style="max-width:100%;border:1px solid rgba(111,99,89,.35)">`;
+      else if (sm.type === 'audio') smb.innerHTML = `<audio controls src="${url}" style="width:100%"></audio>`;
+      else if (sm.type === 'video') smb.innerHTML = `<video controls playsinline src="${url}" style="max-width:100%"></video>`;
+    }
     if (!isAdminView) show('stageView');
   }));
 }
@@ -547,6 +572,7 @@ document.querySelector('#adminTabs [data-tab="cases"]').onclick = () => {
 };
 async function openAdminCase(caseId) {
   adminCase = { id: caseId, ...(await getDoc(doc(db, 'cases', caseId))).data() };
+  window.__activeCase = caseId;
   show('adminCaseTab');
   document.querySelectorAll('#adminTabs button').forEach(b => b.classList.toggle('on', b.id==='adminCaseTab'));
   hide('atab-cases'); show('atab-case');
@@ -574,10 +600,47 @@ async function openAdminCase(caseId) {
     <div id="ac-reflection"></div>
     <div id="ac-materials" class="hidden"></div>
     <div id="ac-slides" class="hidden"></div>
+    <div style="margin-top:34px;border-top:1px solid rgba(111,99,89,.2);padding-top:14px">
+      <button class="ghost" id="caseDel">Delete case</button>
+      <div class="note hidden" id="caseDelBox" style="margin:8px 0">Delete this case, its reflection room, materials and presentations for everyone? This cannot be undone.
+        <button class="ghost" data-casedelyes="1">Yes, delete it</button> <button class="ghost" id="caseDelNo">Keep it</button></div></div>
     <div style="margin-top:26px"><button class="ghost" id="backToCases">&larr; All cases</button></div>`;
   $('caseStatus').onchange = async e => { await updateDoc(doc(db,'cases',caseId), { status: e.target.value }); };
   $('backToCases').onclick = () => { hide('atab-case'); hide('adminCaseTab'); show('atab-cases');
     document.querySelectorAll('#adminTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab==='cases')); loadCases(); };
+  $('caseDel').onclick = () => $('caseDelBox').classList.remove('hidden');
+  $('caseDelNo').onclick = () => $('caseDelBox').classList.add('hidden');
+  el.querySelector('[data-casedelyes]').onclick = async () => {
+    $('caseDelBox').innerHTML = 'Deleting...';
+    const msgs = await getDocs(collection(db, 'cases', caseId, 'messages'));
+    for (const m of msgs.docs) {
+      const ch = await getDocs(collection(db, 'cases', caseId, 'messages', m.id, 'chunks'));
+      for (const d of ch.docs) await deleteDoc(d.ref);
+      await deleteDoc(m.ref);
+    }
+    const ups = await getDocs(collection(db, 'cases', caseId, 'uploads'));
+    for (const u of ups.docs) {
+      const ch = await getDocs(collection(db, 'cases', caseId, 'uploads', u.id, 'chunks'));
+      for (const d of ch.docs) await deleteDoc(d.ref);
+      await deleteDoc(u.ref);
+    }
+    const pres = await getDocs(query(collection(db, 'presentations'), where('clientId','==',adminCase.clientId)));
+    for (const p of pres.docs) {
+      const sl = await getDocs(collection(db, 'presentations', p.id, 'slides'));
+      for (const s of sl.docs) {
+        const ch = await getDocs(collection(db, 'presentations', p.id, 'slides', s.id, 'chunks'));
+        for (const d of ch.docs) await deleteDoc(d.ref);
+        await deleteDoc(s.ref);
+      }
+      await deleteDoc(p.ref);
+    }
+    if (adminCase.videoPoolId) { try { await updateDoc(doc(db, 'videoPool', adminCase.videoPoolId), { assigned: null, assignedAt: null }); } catch(e) {} }
+    await deleteDoc(doc(db, 'rooms', caseId)).catch(()=>{});
+    await deleteDoc(doc(db, 'cases', caseId));
+    hide('atab-case'); hide('adminCaseTab'); show('atab-cases');
+    document.querySelectorAll('#adminTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab==='cases'));
+    loadCases();
+  };
   $('acTabs').onclick = e => {
     if (!e.target.dataset.tab) return;
     document.querySelectorAll('#acTabs button').forEach(b => b.classList.toggle('on', b===e.target));
@@ -636,7 +699,10 @@ async function renderSlidesAdmin(el, clientId, caseId) {
           <button class="ghost" data-del="${p.id}">Delete</button></div></div>
       <div class="note hidden" id="delbox-${p.id}" style="margin:2px 0 10px">Delete this presentation and all its slides for everyone? This cannot be undone.
         <button class="ghost" data-delyes="${p.id}">Yes, delete it</button> <button class="ghost" data-delno="${p.id}">Keep it</button></div>
-      ${slides.map((s,i)=>`<div class="note" style="padding:7px 0;border-top:1px solid rgba(111,99,89,.15)">${i+1}. <b>${esc(s.title||'')}</b>${s.body?' — '+esc(s.body.slice(0,90)):''}</div>`).join('')}
+      ${slides.map((s,i)=>`<div class="note" style="padding:7px 0;border-top:1px solid rgba(111,99,89,.15)">${i+1}. <b>${esc(s.title||'')}</b>${s.body?' — '+esc(s.body.slice(0,90)):''}
+        ${s.media ? `<div style="margin-top:4px">&#9656; ${esc(s.media.name)} <button class="ghost" data-rmmedia="${p.id}:${s.id}" style="padding:2px 8px;font-size:10px">Remove</button></div>` : ''}
+        <button class="ghost" data-addmedia="${p.id}:${s.id}" style="margin-top:4px;padding:2px 8px;font-size:10px">+ Media</button></div>`).join('')}
+      <input type="file" id="mediaPicker" accept="image/*,audio/*,video/*" class="hidden"><div class="note" id="mediaNote"></div>
       <div style="margin-top:12px">
         <div class="field"><label for="st-${p.id}">New slide title</label><input id="st-${p.id}" placeholder="e.g. The living room"></div>
         <div class="field"><label for="sb-${p.id}">Slide text (optional)</label><textarea id="sb-${p.id}" rows="2" placeholder="A sentence or two for this slide"></textarea></div>
@@ -661,6 +727,36 @@ async function renderSlidesAdmin(el, clientId, caseId) {
     const t = $('npTitle').value.trim(); if (!t) return;
     const ref = await addDoc(collection(db,'presentations'), { clientId, title: t, createdAt: serverTimestamp() });
     await addDoc(collection(db,'presentations',ref.id,'slides'), { idx: 0, title: t, body: '' });
+    renderSlidesAdmin(el, clientId, caseId);
+  };
+  let mediaTarget = null;
+  el.querySelectorAll('[data-addmedia]').forEach(b => b.onclick = () => { mediaTarget = b.dataset.addmedia; $('mediaPicker').click(); });
+  el.querySelectorAll('[data-rmmedia]').forEach(b => b.onclick = async () => {
+    const [pid, sid] = b.dataset.rmmedia.split(':');
+    const old = await getDocs(collection(db,'presentations',pid,'slides',sid,'chunks'));
+    for (const d of old.docs) await deleteDoc(d.ref);
+    await updateDoc(doc(db,'presentations',pid,'slides',sid), { media: null });
+    renderSlidesAdmin(el, clientId, caseId);
+  });
+  $('mediaPicker').onchange = async e => {
+    const f = e.target.files[0]; if (!f || !mediaTarget) return;
+    const [pid, sid] = mediaTarget.split(':');
+    const note = $('mediaNote');
+    const kind = f.type.startsWith('image/') ? 'image' : f.type.startsWith('audio/') ? 'audio' : f.type.startsWith('video/') ? 'video' : null;
+    if (!kind) { note.textContent = 'Images, audio or video only.'; return; }
+    if (f.size > 8*1024*1024) { note.textContent = 'Keep files under 8 MB for now - for video, that is a short clip.'; return; }
+    note.textContent = `Storing ${f.name}...`;
+    try {
+      const old = await getDocs(collection(db,'presentations',pid,'slides',sid,'chunks'));
+      for (const d of old.docs) await deleteDoc(d.ref);
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+      await writeChunks(collection(db,'presentations',pid,'slides',sid,'chunks'), btoa(bin));
+      await updateDoc(doc(db,'presentations',pid,'slides',sid), { media: { type: kind, name: f.name, mime: f.type } });
+      note.textContent = '';
+    } catch (err) { note.textContent = 'That did not save. Try again.'; }
+    e.target.value = '';
     renderSlidesAdmin(el, clientId, caseId);
   };
   el.querySelectorAll('[data-addslide]').forEach(b => b.onclick = async () => {
