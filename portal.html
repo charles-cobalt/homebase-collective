@@ -185,7 +185,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, addDoc, collection, query, where, orderBy, onSnapshot, getDocs, serverTimestamp, updateDoc }
+import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, onSnapshot, getDocs, serverTimestamp, updateDoc }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const app = initializeApp(firebaseConfig);
@@ -452,6 +452,12 @@ async function loadCases() {
   });
   el.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openAdminCase(b.dataset.open));
 }
+document.querySelector('#adminTabs [data-tab="cases"]').onclick = () => {
+  if ($('atab-case').classList.contains('hidden')) return;
+  hide('atab-case'); hide('adminCaseTab'); show('atab-cases');
+  document.querySelectorAll('#adminTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab==='cases'));
+  loadCases();
+};
 async function openAdminCase(caseId) {
   adminCase = { id: caseId, ...(await getDoc(doc(db, 'cases', caseId))).data() };
   show('adminCaseTab');
@@ -466,6 +472,7 @@ async function openAdminCase(caseId) {
       <select id="caseStatus">
         <option ${adminCase.status==='Phase one: Presentation'?'selected':''}>Phase one: Presentation</option>
         <option ${adminCase.status==='Phase two: Reflection'?'selected':''}>Phase two: Reflection</option>
+        <option ${adminCase.status==='Phase three: Transformation'?'selected':''}>Phase three: Transformation</option>
         <option ${adminCase.status==='Complete'?'selected':''}>Complete</option>
       </select></div>
     <div class="field" style="max-width:460px;margin-top:14px"><label>Case team - admins on this case</label>
@@ -538,7 +545,10 @@ async function renderSlidesAdmin(el, clientId, caseId) {
     const live = room.active && room.presentationId === p.id;
     html += `<div class="slideedit">
       <div class="row" style="border:none;padding:0 0 10px"><div class="t serif" style="font-size:19px">${esc(p.title)}</div>
-        <div class="acts">${live ? `<button class="solid" data-end="${p.id}">End presentation</button>` : `<button data-live="${p.id}">Present live</button>`}</div></div>
+        <div class="acts">${live ? `<button class="solid" data-end="${p.id}">End presentation</button>` : `<button data-live="${p.id}">Present live</button>`}
+          <button class="ghost" data-del="${p.id}">Delete</button></div></div>
+      <div class="note hidden" id="delbox-${p.id}" style="margin:2px 0 10px">Delete this presentation and all its slides for everyone? This cannot be undone.
+        <button class="ghost" data-delyes="${p.id}">Yes, delete it</button> <button class="ghost" data-delno="${p.id}">Keep it</button></div>
       ${slides.map((s,i)=>`<div class="note" style="padding:7px 0;border-top:1px solid rgba(111,99,89,.15)">${i+1}. <b>${esc(s.title||'')}</b>${s.body?' — '+esc(s.body.slice(0,90)):''}</div>`).join('')}
       <div style="margin-top:12px">
         <div class="field"><label for="st-${p.id}">New slide title</label><input id="st-${p.id}" placeholder="e.g. The living room"></div>
@@ -570,6 +580,18 @@ async function renderSlidesAdmin(el, clientId, caseId) {
     const body = $('sb-'+pid).value.trim();
     const slides = (await getDocs(collection(db,'presentations',pid,'slides'))).size;
     await addDoc(collection(db,'presentations',pid,'slides'), { idx: slides, title, body });
+    renderSlidesAdmin(el, clientId, caseId);
+  });
+  el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => $(`delbox-${b.dataset.del}`).classList.remove('hidden'));
+  el.querySelectorAll('[data-delno]').forEach(b => b.onclick = () => $(`delbox-${b.dataset.delno}`).classList.add('hidden'));
+  el.querySelectorAll('[data-delyes]').forEach(b => b.onclick = async () => {
+    const pid = b.dataset.delyes;
+    const slides = await getDocs(collection(db,'presentations',pid,'slides'));
+    for (const d of slides.docs) await deleteDoc(d.ref);
+    await deleteDoc(doc(db,'presentations',pid));
+    const room = (await getDoc(doc(db,'rooms',caseId))).data();
+    if (room && room.presentationId === pid)
+      await setDoc(doc(db,'rooms',caseId), { active: false, presentationId: null, currentSlide: 0, updatedAt: serverTimestamp() });
     renderSlidesAdmin(el, clientId, caseId);
   });
   el.querySelectorAll('[data-live]').forEach(b => b.onclick = async () => {
