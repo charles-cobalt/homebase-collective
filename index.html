@@ -3,392 +3,110 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="HOMEBASE COLLECTIVE">
-<meta name="theme-color" content="#0c0c0c">
-<title>HOMEBASE COLLECTIVE</title>
-<link rel="stylesheet" href="dinish.css">
+<title>The Home Base Collective</title>
+<meta name="description" content="The Home Base Collective">
+<meta name="theme-color" content="#e3e0db">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%23312e2b'/%3E%3Ctext x='50' y='63' font-family='Georgia,serif' font-size='34' fill='%23e3e0db' text-anchor='middle'%3EH%7CB%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="hbc-fonts.css">
 <style>
-:root{--bg:#0c0c0c;--panel:#141414;--fg:#eceae6;--muted:#959595;--line:#ffffff24;--soft:#ffffff0b;--taupe:#b4a99d;--taupe-dim:#b4a99d33;--ink:#312e2b;color-scheme:dark}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --morel:#6f6359;
+  --dune:#b5aa9e;
+  --coffee:#221913;
+  --steam:#b4b2af;
+  --diesel:#312e2b;
+  --ghosted:#e3e0db;
+  --white:#ffffff;
+  --orchestra:#2d1b18;
+}
+*{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;font-family:DINish,Montserrat,-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;color:var(--fg);background:var(--bg);font-size:14px;line-height:1.6;overflow:hidden}
-button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
-a{color:inherit;text-decoration:none}
-
-/* intro */
-#intro{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;flex-direction:column;background:linear-gradient(180deg,#262626,#121212 35%,#000);transition:opacity 1.1s;cursor:pointer}
-#intro .rule{width:1px;height:44px;background:var(--taupe);margin-bottom:26px;animation:appear 1.2s both}
-#intro h1{font-family:'Noto Serif Display',Newsreader,serif;font-weight:400;font-size:42px;letter-spacing:-.02em;line-height:1.15;margin:0;color:#f0ede8;animation:appear 1.5s both;text-align:center}
-#intro .collective{font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.58em;text-indent:.58em;color:var(--taupe);margin-top:16px;animation:appear 1.8s both;text-align:center}
-.wordref{transform:scaleY(-1);opacity:.14;-webkit-mask-image:linear-gradient(180deg,#000 0,transparent 62%);mask-image:linear-gradient(180deg,#000 0,transparent 62%);margin-top:2px;pointer-events:none}
-.wordref h1{animation:none}
-@keyframes appear{from{opacity:0}to{opacity:1}}
-#intro.gone{opacity:0;pointer-events:none}
-
-/* chrome */
-header{position:fixed;left:0;right:0;top:0;z-index:30;padding:calc(env(safe-area-inset-top) + 19px) 26px 20px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(var(--bg) 65%,transparent);pointer-events:none;opacity:0;transition:opacity .9s}
-body.ready header{opacity:1}
-header .brand{display:flex;align-items:center;gap:12px;pointer-events:auto}
-header .brand .vr{width:1px;height:15px;background:var(--taupe)}
-header .word{font-family:'Noto Serif Display',Newsreader,serif;font-size:14px;letter-spacing:.02em;color:var(--fg)}
-header .word em{font-family:Montserrat,sans-serif;font-style:normal;font-size:8px;letter-spacing:.34em;color:var(--taupe);vertical-align:1px;margin-left:7px}
-
-footer{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 14px);left:26px;right:26px;z-index:30;isolation:isolate;opacity:0;transition:opacity .9s}
-body.ready footer{opacity:1}
-footer:before{content:"";position:absolute;inset:-40px -26px -60px;background:linear-gradient(transparent,var(--bg) 45%);z-index:-1;pointer-events:none}
-nav.pages{display:flex;justify-content:space-between;gap:6px}
-nav.pages button{font-family:Montserrat,sans-serif;font-size:9px;letter-spacing:.3em;text-indent:.3em;color:var(--muted);padding:10px 2px;flex:1;text-align:center;transition:color .3s}
-nav.pages button.on{color:var(--taupe)}
-
-main{position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;opacity:0;transition:opacity .9s}
-body.ready main{opacity:1}
-.page{display:none;padding:calc(env(safe-area-inset-top) + 96px) 26px 120px;max-width:560px;margin:0 auto;animation:pagein .6s both}
-.page.on{display:block}
-@keyframes pagein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-
-/* type + elements */
-.kicker{font-family:Montserrat,sans-serif;font-size:9px;letter-spacing:.42em;color:var(--taupe);margin:0 0 14px}
-h2{font-family:'Noto Serif Display',Newsreader,serif;font-weight:400;font-size:30px;letter-spacing:-.02em;line-height:1.2;margin:0 0 14px;color:var(--fg)}
-h2 em{font-style:italic;color:var(--taupe)}
-.serif-i{font-family:Newsreader,serif;font-style:italic;font-size:19px;color:var(--taupe);margin:0 0 18px}
-.lede{font-size:14px;color:var(--muted);margin:0 0 26px}
-.rule{width:1px;height:34px;background:var(--taupe);margin:0 0 22px}
-section{margin-bottom:52px}
-.cap{font-family:Montserrat,sans-serif;font-size:9px;letter-spacing:.3em;color:var(--muted);margin:0 0 8px}
-.num{font-family:'Noto Serif Display',serif;font-size:13px;color:var(--taupe);margin:0 0 4px}
-h3{font-family:'Noto Serif Display',Newsreader,serif;font-weight:400;font-size:20px;letter-spacing:.01em;margin:0 0 8px}
-p.small{font-size:13px;color:var(--muted);margin:0 0 20px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.card{border:1px solid var(--line);padding:18px;background:var(--soft)}
-.card h3{font-size:16px}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 26px}
-.chips span{font-family:Montserrat,sans-serif;font-size:9px;letter-spacing:.22em;color:var(--taupe);border:1px solid var(--taupe-dim);padding:7px 10px}
-
-/* buttons - square, 1px border, serif, modeled on theirs */
-.btn{display:block;width:100%;text-align:center;font-family:Newsreader,serif;font-size:15px;padding:15px 20px;border:1px solid var(--taupe);color:#eceae6;background:transparent;cursor:pointer;margin:0 0 10px;transition:background .25s}
-.btn.solid{background:var(--taupe);color:var(--ink)}
-.btn.ghost{border-color:var(--line);color:var(--muted)}
-.btnrow{display:grid;gap:10px;margin:6px 0 26px}
-
-/* forms */
-form .flabel{font-family:Montserrat,sans-serif;font-size:9px;letter-spacing:.3em;color:var(--muted);display:block;margin:20px 0 7px}
-input[type=text],input[type=email],input[type=tel],input[type=url],textarea{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--fg);font-family:Newsreader,serif;font-size:15px;padding:9px 2px;outline:none;border-radius:0}
-input:focus,textarea:focus{border-bottom-color:var(--taupe)}
-textarea{min-height:74px;resize:vertical}
-.checks{display:grid;gap:8px;margin-top:6px}
-.checks label{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--muted);border:1px solid var(--line);padding:11px 12px;cursor:pointer}
-.checks label.sel{border-color:var(--taupe);color:var(--fg)}
-.checks input{display:none}
-.note{font-size:11px;color:var(--muted);margin-top:14px}
+body{
+  min-height:100dvh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:
+    radial-gradient(130% 95% at 50% 26%, #fbfaf7 0%, var(--ghosted) 58%, #d8d3cc 100%);
+  font-family:'Mulish',system-ui,sans-serif;
+  color:var(--diesel);
+}
+.stage{
+  padding:48px 24px;
+  text-align:center;
+}
+.mark{
+  width:min(72vw,320px);
+  margin:0 auto;
+  animation:rise 1.5s cubic-bezier(.22,.75,.25,1) both .15s;
+}
+.mark svg{display:block;width:100%;height:auto}
+.arc{
+  font-family:'Montserrat',sans-serif;
+  font-size:11px;
+  letter-spacing:.34em;
+  fill:var(--morel);
+}
+.arc-b{letter-spacing:.40em}
+.mono{
+  font-family:'Noto Serif Display',serif;
+  font-size:46px;
+  letter-spacing:.04em;
+  fill:var(--diesel);
+}
+.rule{stroke:var(--diesel);stroke-width:1.3}
+.reflection{
+  width:min(72vw,320px);
+  margin:10px auto 0;
+  transform:scaleY(-1);
+  -webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.24), rgba(0,0,0,0) 52%);
+  mask-image:linear-gradient(to bottom, rgba(0,0,0,.24), rgba(0,0,0,0) 52%);
+  pointer-events:none;
+  animation:rise 1.5s cubic-bezier(.22,.75,.25,1) both .3s;
+}
+@keyframes rise{
+  from{opacity:0;transform:translateY(16px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.reflection{transform-origin:center}
+@keyframes rise-reflect{
+  from{opacity:0;transform:scaleY(-1) translateY(16px)}
+  to{opacity:1;transform:scaleY(-1) translateY(0)}
+}
+.reflection{animation-name:rise-reflect}
+@media (prefers-reduced-motion: reduce){
+  .mark,.reflection{animation:none}
+}
 </style>
 </head>
 <body>
-
-<div id="intro" aria-label="Homebase Collective intro">
-  <div class="rule" aria-hidden="true"></div>
-  <div>
-    <h1>HOMEBASE</h1>
-    <div class="collective">COLLECTIVE</div>
-    <div class="wordref" aria-hidden="true"><h1>HOMEBASE</h1></div>
+<main class="stage">
+  <div class="mark" role="img" aria-label="The Home Base Collective">
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <path id="hb-top" d="M 28,100 A 72,72 0 0 1 172,100" fill="none"/>
+        <path id="hb-bot" d="M 31,100 A 69,69 0 0 0 169,100" fill="none"/>
+      </defs>
+      <text class="arc"><textPath href="#hb-top" startOffset="50%" text-anchor="middle">THE HOME BASE</textPath></text>
+      <text class="arc arc-b"><textPath href="#hb-bot" startOffset="50%" text-anchor="middle">COLLECTIVE</textPath></text>
+      <text class="mono" x="77" y="115" text-anchor="middle">H</text>
+      <line class="rule" x1="100" y1="80" x2="100" y2="118"/>
+      <text class="mono" x="123" y="115" text-anchor="middle">B</text>
+    </svg>
   </div>
-</div>
-
-<header>
-  <a class="brand" href="#/home" aria-label="Homebase Collective home">
-    <span class="vr" aria-hidden="true"></span>
-    <span class="word">Homebase<em>COLLECTIVE</em></span>
-  </a>
-</header>
-
-<main>
-
-<!-- HOME -->
-<div class="page" id="p-home">
-  <section style="text-align:center;padding-top:26px">
-    <div class="rule" style="margin:0 auto 26px"></div>
-    <h2 style="font-size:38px">MAKE A<br>HOME BASE</h2>
-    <p class="serif-i">for what comes next.</p>
-    <p class="kicker" style="margin-top:22px">WE HELP PEOPLE AND TEAMS BRING THEIR WORK, THEIR LIVES AND THEIR SPACES INTO ALIGNMENT</p>
-    <div class="btnrow" style="margin-top:30px">
-      <a class="btn solid" href="#/apply">APPLY FOR THE METHOD</a>
-      <a class="btn" href="#/reset">BOOK THE RESET</a>
-    </div>
-  </section>
-
-  <section>
-    <p class="kicker">WHY HOME BASE?</p>
-    <p class="lede">Some people work on themselves. Others rework their surroundings. Lasting change asks for both at once - the person and the place, moving in the same direction.</p>
-  </section>
-
-  <section class="cols">
-    <div class="card">
-      <p class="cap">FOR BUSINESSES</p>
-      <h3>THE METHOD</h3>
-      <p class="small">A guided way to shape a company where people do not just work - they belong.</p>
-      <a class="btn ghost" style="margin:0" href="#/method">LEARN MORE</a>
-    </div>
-    <div class="card">
-      <p class="cap">FOR INDIVIDUALS</p>
-      <h3>THE RESET</h3>
-      <p class="small">One 90-minute virtual session to reset your space, your energy and your path.</p>
-      <a class="btn ghost" style="margin:0" href="#/reset">LEARN MORE</a>
-    </div>
-  </section>
-
-  <section>
-    <p class="kicker">OUR APPROACH</p>
-    <p class="num">01</p><h3>DISCOVER</h3>
-    <p class="small">We start with your vision, your values and what is shifting.</p>
-    <p class="num">02</p><h3>ALIGN</h3>
-    <p class="small">We bring your people, your purpose and your environment onto the same page.</p>
-    <p class="num">03</p><h3>CREATE</h3>
-    <p class="small">We shape the spaces and experiences that carry it forward.</p>
-  </section>
-
-  <section style="text-align:center">
-    <div class="rule" style="margin:0 auto 22px"></div>
-    <p class="serif-i">Two practices. One shared belief.</p>
-    <a class="btn" href="#/about">MEET THE FOUNDERS</a>
-  </section>
-
-  <section>
-    <p class="kicker">NOTES FROM HOME BASE</p>
-    <p class="small">Occasional letters on space, energy and what comes next.</p>
-    <form data-form="newsletter">
-      <input type="email" name="Email" required placeholder="" aria-label="Email address">
-      <button class="btn" type="submit" style="margin-top:14px">SIGN UP</button>
-    </form>
-  </section>
-</div>
-
-<!-- METHOD -->
-<div class="page" id="p-method">
-  <section>
-    <div class="rule"></div>
-    <p class="kicker">FOR BUSINESSES</p>
-    <h2>THE METHOD</h2>
-    <p class="serif-i">A business people can feel.</p>
-    <p class="lede">The Method is a guided engagement for founders and teams. We look at how your people work, what your business stands for, and the place it all happens - then bring the three into alignment, so your space becomes part of how the work gets done.</p>
-  </section>
-  <section>
-    <p class="kicker">WHAT IT COVERS</p>
-    <p class="num">01</p><h3>DISCOVER</h3>
-    <p class="small">Your vision, values and the season your business is in.</p>
-    <p class="num">02</p><h3>ALIGN</h3>
-    <p class="small">Your team, your purpose and your environment, mapped together.</p>
-    <p class="num">03</p><h3>CREATE</h3>
-    <p class="small">A space and rhythm designed around how you actually work.</p>
-  </section>
-  <section>
-    <a class="btn solid" href="#/apply">APPLY FOR THE METHOD</a>
-    <p class="note">Applications are reviewed by the founders. We reply within two business days.</p>
-  </section>
-</div>
-
-<!-- METHOD APPLICATION -->
-<div class="page" id="p-apply">
-  <section>
-    <div class="rule"></div>
-    <p class="kicker">THE METHOD</p>
-    <h2>APPLICATION</h2>
-    <p class="lede">Tell us where your business is and where it is going. There are no wrong answers.</p>
-    <form data-form="application">
-      <span class="flabel">NAME *</span><input type="text" name="Name" required>
-      <span class="flabel">EMAIL *</span><input type="email" name="Email" required>
-      <span class="flabel">BUSINESS NAME</span><input type="text" name="Business">
-      <span class="flabel">WEBSITE</span><input type="url" name="Website">
-      <span class="flabel">WHAT BRINGS YOU HERE?</span>
-      <div class="checks" data-name="Brings you">
-        <label><input type="checkbox" value="Building our first home base">Building our first home base</label>
-        <label><input type="checkbox" value="Outgrown our current space">We have outgrown our current space</label>
-        <label><input type="checkbox" value="Moving into a new space">Moving into a new space</label>
-        <label><input type="checkbox" value="Redesigning our current space">Redesigning our current space</label>
-        <label><input type="checkbox" value="Reimagining how our team works">Reimagining how our team works</label>
-        <label><input type="checkbox" value="Other">Something else</label>
-      </div>
-      <span class="flabel">WHAT DO YOU WANT FROM YOUR SPACE?</span>
-      <div class="checks" data-name="Wants">
-        <label><input type="checkbox" value="A space that reflects our vision and values">A space that reflects our vision and values</label>
-        <label><input type="checkbox" value="A better experience for our team">A better experience for our team</label>
-        <label><input type="checkbox" value="A more connected way of working">A more connected way of working</label>
-        <label><input type="checkbox" value="A workplace that supports wellbeing">A workplace that supports wellbeing</label>
-        <label><input type="checkbox" value="A foundation for future growth">A foundation for future growth</label>
-        <label><input type="checkbox" value="Clarity on what we need next">Clarity on what we need next</label>
-      </div>
-      <span class="flabel">WHAT ARE YOU INTERESTED IN?</span>
-      <div class="checks" data-name="Interest">
-        <label><input type="checkbox" value="Not sure yet - exploring">Not sure yet, exploring what fits</label>
-        <label><input type="checkbox" value="Space audit">A space audit</label>
-        <label><input type="checkbox" value="The full Method">The full Method</label>
-        <label><input type="checkbox" value="Both">Both - show us how they work together</label>
-      </div>
-      <span class="flabel">TIMELINE</span>
-      <div class="checks" data-name="Timeline">
-        <label><input type="checkbox" value="Ready to begin">We are ready to begin</label>
-        <label><input type="checkbox" value="3-6 months">Within 3-6 months</label>
-        <label><input type="checkbox" value="6-12 months">Within 6-12 months</label>
-        <label><input type="checkbox" value="Exploring">Exploring what is possible</label>
-      </div>
-      <span class="flabel">TELL US ABOUT YOUR BUSINESS</span>
-      <textarea name="About the business"></textarea>
-      <span class="flabel">ANYTHING ELSE?</span>
-      <textarea name="Anything else"></textarea>
-      <button class="btn solid" type="submit" style="margin-top:26px">SUBMIT</button>
-    </form>
-  </section>
-</div>
-
-<!-- RESET -->
-<div class="page" id="p-reset">
-  <section>
-    <div class="rule"></div>
-    <p class="kicker">FOR INDIVIDUALS</p>
-    <h2>THE RESET</h2>
-    <p class="serif-i">A 90-minute virtual reset for your space and your story.</p>
-    <p class="lede">We look at what is shifting inside you, then tune the space around you to support who you are becoming. You do not need to change everything - just to see what you are carrying, and what your space is carrying with you.</p>
-    <p class="cap">FOR MOMENTS OF</p>
-    <div class="chips"><span>TRANSITION</span><span>OVERWHELM</span><span>UPLEVEL</span><span>REALIGNMENT</span></div>
-  </section>
-  <section class="cols">
-    <div class="card">
-      <p class="cap">INTERNAL</p>
-      <p class="small" style="margin:0">Thoughts and beliefs<br>Emotions and energy<br>Patterns and rhythms</p>
-    </div>
-    <div class="card">
-      <p class="cap">EXTERNAL</p>
-      <p class="small" style="margin:0">Your environment<br>The energy of your space<br>Flow and function</p>
-    </div>
-  </section>
-  <section>
-    <p class="kicker">WHAT TO EXPECT</p>
-    <p class="num">01</p><h3>OPENING - ABOUT 30 MINUTES</h3>
-    <p class="small">Settle in. A grounding start, a clear container, and an honest look at the season you are in.</p>
-    <p class="num">02</p><h3>THE INNER WORK - ABOUT 25 MINUTES</h3>
-    <p class="small">Name the patterns, shift the story, and set rituals that fit your next chapter.</p>
-    <p class="num">03</p><h3>THE SPACE WALK-THROUGH - ABOUT 25 MINUTES</h3>
-    <p class="small">We read your space together in real time and make simple shifts with light, flow and what you already own.</p>
-    <p class="small">Within 24 hours you receive your personal Reset Blueprint: key insights, rituals and resources, and direction for your space.</p>
-  </section>
-  <section>
-    <p class="kicker">REQUEST THE RESET</p>
-    <p class="small">Send a booking request and we will reply with times and details.</p>
-    <form data-form="reset">
-      <span class="flabel">NAME *</span><input type="text" name="Name" required>
-      <span class="flabel">EMAIL *</span><input type="email" name="Email" required>
-      <span class="flabel">WHAT IS SHIFTING FOR YOU?</span><textarea name="What is shifting"></textarea>
-      <span class="flabel">PREFERRED DAYS OR TIMES</span><input type="text" name="Preferred times">
-      <button class="btn solid" type="submit" style="margin-top:26px">REQUEST THE RESET</button>
-    </form>
-  </section>
-</div>
-
-<!-- ABOUT -->
-<div class="page" id="p-about">
-  <section>
-    <div class="rule"></div>
-    <p class="kicker">ABOUT</p>
-    <h2>THE HOME BASE<br>COLLECTIVE</h2>
-    <p class="serif-i">We believe lasting change is inner and outer at once - the person and the place, rising together.</p>
-  </section>
-  <section>
-    <p class="kicker">OUR ORIGIN</p>
-    <p class="lede">Home Base began in the in-between: the season where one chapter ends before the next has taken shape. Again and again we saw the same gap - inner work unsupported by the spaces people return to, and beautiful rooms disconnected from the lives inside them. We believed there was another way: consider the person and the place together.</p>
-  </section>
-  <section>
-    <p class="kicker">MEET THE FOUNDERS</p>
-    <p class="serif-i">Different paths. A shared belief.</p>
-    <div class="card" style="margin-bottom:14px">
-      <p class="cap">FOUNDER - SPACE & DESIGN</p>
-      <h3>THE EXTERNAL FOUNDATION</h3>
-      <p class="small" style="margin:0">A background in interiors and the built environment: light, material, form and flow, and how the places we inhabit shape how we feel and work.</p>
-    </div>
-    <div class="card">
-      <p class="cap">FOUNDER - COACHING & COMMUNICATION</p>
-      <h3>THE INTERNAL CONVERSATION</h3>
-      <p class="small" style="margin:0">A background in communication and human behavior: the patterns, stories and daily rhythms that a true reset has to reach.</p>
-    </div>
-  </section>
-</div>
-
-<!-- CONTACT -->
-<div class="page" id="p-contact">
-  <section>
-    <div class="rule"></div>
-    <p class="kicker">CONTACT US</p>
-    <h2>WE WOULD LOVE<br>TO HEAR FROM YOU</h2>
-    <p class="lede">Questions about the Method or the Reset, or interested in working together? Send a note and we will reply within our normal hours, Monday to Friday.</p>
-    <form data-form="contact">
-      <span class="flabel">NAME *</span><input type="text" name="Name" required>
-      <span class="flabel">EMAIL *</span><input type="email" name="Email" required>
-      <span class="flabel">PHONE *</span><input type="tel" name="Phone" required>
-      <span class="flabel">SUBJECT *</span><input type="text" name="Subject" required>
-      <span class="flabel">MESSAGE *</span><textarea name="Message" required></textarea>
-      <button class="btn solid" type="submit" style="margin-top:26px">SEND</button>
-    </form>
-  </section>
-</div>
-
+  <div class="reflection" aria-hidden="true">
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <path id="hb-top-r" d="M 28,100 A 72,72 0 0 1 172,100" fill="none"/>
+        <path id="hb-bot-r" d="M 31,100 A 69,69 0 0 0 169,100" fill="none"/>
+      </defs>
+      <text class="arc"><textPath href="#hb-top-r" startOffset="50%" text-anchor="middle">THE HOME BASE</textPath></text>
+      <text class="arc arc-b"><textPath href="#hb-bot-r" startOffset="50%" text-anchor="middle">COLLECTIVE</textPath></text>
+      <text class="mono" x="77" y="115" text-anchor="middle">H</text>
+      <line class="rule" x1="100" y1="80" x2="100" y2="118"/>
+      <text class="mono" x="123" y="115" text-anchor="middle">B</text>
+    </svg>
+  </div>
 </main>
-
-<footer>
-  <nav class="pages" aria-label="Main navigation">
-    <button data-go="#/method">METHOD</button>
-    <button data-go="#/reset">RESET</button>
-    <button data-go="#/about">ABOUT</button>
-    <button data-go="#/contact">CONTACT</button>
-  </nav>
-</footer>
-
-<script>
-const intro=document.getElementById('intro');
-let entered=false;
-function enter(){
-  if(entered)return;entered=true;
-  intro.classList.add('gone');
-  document.body.classList.add('ready');
-  setTimeout(()=>intro.remove(),1300);
-}
-intro.addEventListener('click',enter);
-setTimeout(enter,2400);
-
-const routes={'#/home':'p-home','#/method':'p-method','#/apply':'p-apply','#/reset':'p-reset','#/about':'p-about','#/contact':'p-contact'};
-const navMap={'p-method':'#/method','p-apply':'#/method','p-reset':'#/reset','p-about':'#/about','p-contact':'#/contact'};
-function go(){
-  const h=location.hash in routes?location.hash:'#/home';
-  const id=routes[h];
-  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id===id));
-  document.querySelectorAll('nav.pages button').forEach(b=>b.classList.toggle('on',navMap[id]===b.dataset.go));
-  document.querySelector('main').scrollTop=0;
-}
-window.addEventListener('hashchange',go);
-document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>location.hash=b.dataset.go));
-go();
-
-/* checkbox styling */
-document.querySelectorAll('.checks label').forEach(l=>{
-  l.addEventListener('click',()=>{const c=l.querySelector('input');setTimeout(()=>l.classList.toggle('sel',c.checked));});
-});
-
-/* forms -> mailto (no backend on free hosting) */
-const SUBJECTS={newsletter:'Newsletter signup - Homebase Collective',application:'Method Application',reset:'Reset booking request',contact:'Contact - Homebase Collective'};
-document.querySelectorAll('form[data-form]').forEach(f=>{
-  f.addEventListener('submit',e=>{
-    e.preventDefault();
-    const kind=f.dataset.form;
-    const lines=[];
-    f.querySelectorAll('input[name],textarea[name]').forEach(el=>{if(el.value)lines.push(el.name+': '+el.value);});
-    f.querySelectorAll('.checks').forEach(g=>{
-      const vals=[...g.querySelectorAll('input:checked')].map(c=>c.value);
-      if(vals.length)lines.push(g.dataset.name+': '+vals.join('; '));
-    });
-    const body=lines.join('\n');
-    location.href='mailto:'+'?subject='+encodeURIComponent(SUBJECTS[kind]||'Homebase Collective')+'&body='+encodeURIComponent(body);
-  });
-});
-</script>
 </body>
 </html>
