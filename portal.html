@@ -604,7 +604,10 @@ async function loadCases() {
       const list = byClient[c.id] || [];
       const caseRows = list.map(k => `<div class="s" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px">
           <span>${esc(k.title||'case')}${k.status?' · '+esc(k.status):''}</span>
-          <button class="ghost" data-open="${k.id}" style="padding:4px 12px;font-size:11px">Open case</button></div>`).join('');
+          <span style="white-space:nowrap"><button class="ghost" data-open="${k.id}" style="padding:4px 12px;font-size:11px">Open case</button>
+          <button class="ghost" data-cdel="${k.id}" title="Delete case" style="padding:4px 10px;font-size:12px;color:var(--morel)">&times;</button></span></div>
+          <div class="note hidden" id="cdel-${k.id}" style="margin:4px 0 2px">Delete this case, its reflection room, materials and presentations for everyone? This cannot be undone.
+            <button class="ghost" data-cdelyes="${k.id}" data-client="${c.id}" data-pool="${k.videoPoolId||''}" style="padding:2px 10px;font-size:10px">Yes, delete it</button> <button class="ghost" data-cdelno="${k.id}" style="padding:2px 10px;font-size:10px">Keep it</button></div>`).join('');
       return `<div class="row" style="display:block"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.email)}${list.length?'':' · no case yet'}</div>
         ${caseRows}
         <div style="margin-top:8px"><button class="ghost" data-new="${c.id}" data-name="${esc(c.name)}" data-n="${list.length+1}" style="padding:4px 12px;font-size:11px">+ New case</button></div></div>`;
@@ -618,6 +621,13 @@ async function loadCases() {
     loadCases();
   });
   el.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openAdminCase(b.dataset.open));
+  el.querySelectorAll('[data-cdel]').forEach(b => b.onclick = () => $(`cdel-${b.dataset.cdel}`).classList.remove('hidden'));
+  el.querySelectorAll('[data-cdelno]').forEach(b => b.onclick = () => $(`cdel-${b.dataset.cdelno}`).classList.add('hidden'));
+  el.querySelectorAll('[data-cdelyes]').forEach(b => b.onclick = async () => {
+    $(`cdel-${b.dataset.cdelyes}`).textContent = 'Deleting...';
+    await deleteCaseDeep(b.dataset.cdelyes, b.dataset.client, b.dataset.pool || null);
+    loadCases();
+  });
 }
 document.querySelector('#adminTabs [data-tab="cases"]').onclick = () => {
   if ($('atab-case').classList.contains('hidden')) return;
@@ -626,6 +636,34 @@ document.querySelector('#adminTabs [data-tab="cases"]').onclick = () => {
   document.body.classList.remove('reflect');
   loadCases();
 };
+/* ---------- deep case delete (shared by case view and cases list) ---------- */
+async function deleteCaseDeep(caseId, clientId, videoPoolId) {
+  const msgs = await getDocs(collection(db, 'cases', caseId, 'messages'));
+  for (const m of msgs.docs) {
+    const ch = await getDocs(collection(db, 'cases', caseId, 'messages', m.id, 'chunks'));
+    for (const d of ch.docs) await deleteDoc(d.ref);
+    await deleteDoc(m.ref);
+  }
+  const ups = await getDocs(collection(db, 'cases', caseId, 'uploads'));
+  for (const u of ups.docs) {
+    const ch = await getDocs(collection(db, 'cases', caseId, 'uploads', u.id, 'chunks'));
+    for (const d of ch.docs) await deleteDoc(d.ref);
+    await deleteDoc(u.ref);
+  }
+  const pres = await getDocs(query(collection(db, 'presentations'), where('clientId','==',clientId)));
+  for (const p of pres.docs) {
+    const sl = await getDocs(collection(db, 'presentations', p.id, 'slides'));
+    for (const sd of sl.docs) {
+      const ch = await getDocs(collection(db, 'presentations', p.id, 'slides', sd.id, 'chunks'));
+      for (const d of ch.docs) await deleteDoc(d.ref);
+      await deleteDoc(sd.ref);
+    }
+    await deleteDoc(p.ref);
+  }
+  if (videoPoolId) { try { await updateDoc(doc(db, 'videoPool', videoPoolId), { assigned: null, assignedAt: null }); } catch(e) {} }
+  await deleteDoc(doc(db, 'rooms', caseId)).catch(()=>{});
+  await deleteDoc(doc(db, 'cases', caseId));
+}
 async function openAdminCase(caseId) {
   adminCase = { id: caseId, ...(await getDoc(doc(db, 'cases', caseId))).data() };
   window.__activeCase = caseId;
@@ -675,31 +713,7 @@ async function openAdminCase(caseId) {
   $('caseDelNo').onclick = () => $('caseDelBox').classList.add('hidden');
   el.querySelector('[data-casedelyes]').onclick = async () => {
     $('caseDelBox').innerHTML = 'Deleting...';
-    const msgs = await getDocs(collection(db, 'cases', caseId, 'messages'));
-    for (const m of msgs.docs) {
-      const ch = await getDocs(collection(db, 'cases', caseId, 'messages', m.id, 'chunks'));
-      for (const d of ch.docs) await deleteDoc(d.ref);
-      await deleteDoc(m.ref);
-    }
-    const ups = await getDocs(collection(db, 'cases', caseId, 'uploads'));
-    for (const u of ups.docs) {
-      const ch = await getDocs(collection(db, 'cases', caseId, 'uploads', u.id, 'chunks'));
-      for (const d of ch.docs) await deleteDoc(d.ref);
-      await deleteDoc(u.ref);
-    }
-    const pres = await getDocs(query(collection(db, 'presentations'), where('clientId','==',adminCase.clientId)));
-    for (const p of pres.docs) {
-      const sl = await getDocs(collection(db, 'presentations', p.id, 'slides'));
-      for (const s of sl.docs) {
-        const ch = await getDocs(collection(db, 'presentations', p.id, 'slides', s.id, 'chunks'));
-        for (const d of ch.docs) await deleteDoc(d.ref);
-        await deleteDoc(s.ref);
-      }
-      await deleteDoc(p.ref);
-    }
-    if (adminCase.videoPoolId) { try { await updateDoc(doc(db, 'videoPool', adminCase.videoPoolId), { assigned: null, assignedAt: null }); } catch(e) {} }
-    await deleteDoc(doc(db, 'rooms', caseId)).catch(()=>{});
-    await deleteDoc(doc(db, 'cases', caseId));
+    await deleteCaseDeep(caseId, adminCase.clientId, adminCase.videoPoolId);
     document.body.classList.remove('reflect');
     hide('atab-case'); hide('adminCaseTab'); show('atab-cases');
     document.querySelectorAll('#adminTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab==='cases'));
