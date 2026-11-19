@@ -60,7 +60,7 @@ label{display:block;margin:0 0 6px;font-family:'Montserrat',sans-serif;text-tran
 
 header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:18px 22px;border-bottom:1px solid rgba(111,99,89,.25)}
+  padding:calc(18px + env(safe-area-inset-top)) 22px 18px;border-bottom:1px solid rgba(111,99,89,.25)}
 header .brand{display:flex;align-items:center;gap:12px}
 header .brand svg{width:44px;height:44px;display:block}
 header .wordmark{font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:.3em;color:var(--morel)}
@@ -73,23 +73,27 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
 .err{color:#8a3b2e;font-size:13px;margin:6px 0 14px;min-height:18px}
 
 /* tabs */
-.tabs{display:flex;gap:0;border-bottom:1px solid rgba(111,99,89,.3);margin:26px 0 22px}
+.tabs{display:flex;flex-wrap:wrap;gap:0;border-bottom:1px solid rgba(111,99,89,.3);margin:26px 0 22px}
 .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;padding:12px 18px;color:var(--morel)}
 .tabs button.on{border-bottom-color:var(--diesel);color:var(--diesel)}
 .tabs button:hover{background:none;color:var(--coffee)}
 
 /* chat */
 .chatlog{display:flex;flex-direction:column;gap:14px;padding:6px 0 20px;min-height:120px}
-.msg{max-width:78%;padding:12px 16px;font-size:15px;line-height:1.55}
+.row .t,.row .s,h1,h2{overflow-wrap:anywhere}
+.msg{max-width:78%;padding:12px 16px;font-size:15px;line-height:1.55;overflow-wrap:anywhere}
 .msg .who{font-family:'Montserrat',sans-serif;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--morel);margin-bottom:5px}
 .msg.mine{align-self:flex-end;background:rgba(49,46,43,.92);color:var(--ghosted)}
 .msg.mine .who{color:var(--steam)}
 .msg.theirs{align-self:flex-start;background:rgba(255,255,255,.8);border:1px solid rgba(181,170,158,.5)}
 .chatbox{display:flex;gap:10px;margin-top:8px}
-.chatbox input{flex:1}
-.msg .filechip{display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 12px;border:1px solid rgba(181,170,158,.55);font-family:'Montserrat',sans-serif;font-size:11px;letter-spacing:.05em}
+.chatbox input{flex:1;min-width:0}
+.msg .filechip{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px;padding:8px 12px;border:1px solid rgba(181,170,158,.55);font-family:'Montserrat',sans-serif;font-size:11px;letter-spacing:.05em}
+.msg .filechip span{min-width:0;overflow-wrap:anywhere}
 .msg.mine .filechip{border-color:rgba(255,255,255,.35)}
 .msg .filechip button{padding:2px 8px;font-size:10px}
+.msg.mine .filechip{color:var(--ghosted)}
+.msg.mine .filechip button{color:var(--ghosted);border-color:rgba(255,255,255,.35)}
 .teamline{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px}
 .teamchip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid rgba(181,170,158,.5);font-size:13px;background:rgba(255,255,255,.55)}
 .teamchip button{border:none;background:none;padding:0;color:var(--morel);cursor:pointer;font-size:14px;line-height:1}
@@ -488,7 +492,15 @@ function startClient() {
     const picker = $('clientCasePicker');
     if (picker) {
       if (cases.length > 1) {
-        picker.innerHTML = cases.map(c => `<button class="ghost" data-case="${c.id}" style="padding:4px 12px;font-size:11px;${c.id===myCase.id?'border-color:var(--morel);font-weight:700;':''}">${esc(c.title||'Case')}</button>`).join(' ');
+        const titleCount = {};
+        cases.forEach(c => { const t = c.title || 'Case'; titleCount[t] = (titleCount[t] || 0) + 1; });
+        const titleSeen = {};
+        picker.innerHTML = cases.map(c => {
+          const t = c.title || 'Case';
+          titleSeen[t] = (titleSeen[t] || 0) + 1;
+          const label = titleCount[t] > 1 ? `${t} ${titleSeen[t]}` : t;
+          return `<button class="ghost" data-case="${c.id}" style="padding:4px 12px;font-size:11px;${c.id===myCase.id?'border-color:var(--morel);font-weight:700;':''}">${esc(label)}</button>`;
+        }).join(' ');
         picker.classList.remove('hidden');
         picker.querySelectorAll('[data-case]').forEach(b => b.onclick = () => { myCase = cases.find(c=>c.id===b.dataset.case); window.__activeCase = myCase.id; renderClientCase(); });
       } else picker.classList.add('hidden');
