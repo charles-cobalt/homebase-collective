@@ -29,6 +29,23 @@ button{font-family:'Montserrat',sans-serif;text-transform:uppercase;letter-spaci
   transition:background .25s,color .25s}
 button:hover{background:var(--diesel);color:var(--ghosted)}
 button.solid{background:var(--diesel);color:var(--ghosted)}
+
+/* night theme - the dark side of the house palette: coffee and orchestra grounds, dune accents */
+body.night{background:radial-gradient(130% 95% at 50% 20%, #2a211c 0%, #1a1411 60%, #100c0a 100%);color:var(--ghosted)}
+body.night .caps, body.night label, body.night .note, body.night .row .s, body.night header .wordmark,
+body.night button.ghost, body.night .appfoot-name, body.night .appfoot-by, body.night .empty{color:var(--dune)}
+body.night h1, body.night h2, body.night h3, body.night .serif, body.night .tabs button.on,
+body.night button.ghost:hover, body.night .row .t, body.night .stage-view .body{color:var(--ghosted)}
+body.night .tabs button.on{border-bottom-color:var(--ghosted)}
+body.night input, body.night textarea, body.night select{background:rgba(255,255,255,.06);border-color:rgba(181,170,158,.4);color:var(--ghosted)}
+body.night .slideedit{background:rgba(255,255,255,.04);border-color:rgba(181,170,158,.3)}
+body.night header{border-bottom-color:rgba(181,170,158,.25)}
+body.night .row{border-bottom-color:rgba(181,170,158,.25)}
+body.night .msg.theirs{background:rgba(255,255,255,.07);border-color:rgba(181,170,158,.35);color:var(--ghosted)}
+body.night .stage-view{background:radial-gradient(130% 95% at 50% 20%, #2a211c 0%, #171210 60%, #0f0b09 100%)}
+body.night .stage-view h1{color:var(--ghosted)}
+body.night #gearMenu{background:#241d18;border-color:rgba(181,170,158,.4)}
+body.night .teamchip{border-color:rgba(181,170,158,.4)}
 button.solid:hover{background:var(--coffee)}
 button.ghost{border-color:transparent;color:var(--morel);padding:8px 10px}
 button.ghost:hover{background:none;color:var(--coffee)}
@@ -106,6 +123,7 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
 </style>
 </head>
 <body>
+<script>try{if(localStorage.getItem('thb-theme')==='night')document.body.classList.add('night')}catch(e){}</script>
 <header>
   <div class="brand">
     <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" aria-label="The Home Base Collective">
@@ -121,9 +139,15 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
     </svg>
     <div class="wordmark">THE HOME BASE</div>
   </div>
-  <div>
-    <span id="who" class="caps" style="margin-right:12px"></span>
-    <button id="signout" class="ghost hidden">Sign out</button>
+  <div style="position:relative">
+    <button id="gearBtn" class="ghost hidden" title="Settings" style="font-size:17px;padding:6px 8px">&#9881;</button>
+    <div id="gearMenu" class="hidden" style="position:absolute;right:0;top:46px;min-width:230px;background:#fff;border:1px solid rgba(111,99,89,.35);padding:16px;z-index:60;text-align:left">
+      <div class="caps" id="gmName" style="margin-bottom:4px"></div>
+      <div class="note" id="gmEmail"></div>
+      <div class="note" id="gmRole" style="margin-bottom:12px"></div>
+      <button class="ghost" id="themeToggle" style="padding:6px 12px;font-size:11px;border:1px solid rgba(111,99,89,.35);margin-bottom:12px">Night mode</button><br>
+      <button class="ghost" id="signout" style="padding:6px 0">Sign out</button>
+    </div>
   </div>
 </header>
 
@@ -267,16 +291,26 @@ $('authGo').onclick = async () => {
     $('authErr').textContent = ({'auth/invalid-credential':'Email or password not recognized.','auth/email-already-in-use':'That email already has a profile - sign in instead.','auth/weak-password':'Password needs at least 6 characters.','auth/invalid-email':'That email address is not valid.'})[e.code] || 'Something went wrong. Try again.';
   }
 };
-$('signout').onclick = () => signOut(auth);
+$('signout').onclick = () => { try { stopStageVideo(); hide('stageView'); } catch(e) {} signOut(auth); };
+$('gearBtn').onclick = e => { e.stopPropagation(); $('gearMenu').classList.toggle('hidden'); };
+document.addEventListener('click', e => { const gm = $('gearMenu'); if (gm && !gm.classList.contains('hidden') && !gm.contains(e.target) && e.target !== $('gearBtn')) gm.classList.add('hidden'); });
+$('themeToggle').onclick = () => {
+  const night = document.body.classList.toggle('night');
+  try { localStorage.setItem('thb-theme', night ? 'night' : 'day'); } catch(e) {}
+  $('themeToggle').textContent = night ? 'Day mode' : 'Night mode';
+};
 
 onAuthStateChanged(auth, async user => {
   unsub.forEach(u => u()); unsub = [];
   me = user;
   ['auth','client','admin'].forEach(hide);
-  if (!user) { show('auth'); $('who').textContent=''; hide('signout'); return; }
+  if (!user) { show('auth'); hide('gearBtn'); hide('gearMenu'); return; }
   myProfile = (await getDoc(doc(db, 'users', user.uid))).data() || { name: user.email, role: 'client' };
-  $('who').textContent = myProfile.name;
-  show('signout');
+  $('gmName').textContent = myProfile.name || '';
+  $('gmEmail').textContent = user.email || '';
+  $('gmRole').textContent = myProfile.role === 'admin' ? 'Studio admin' : 'Client';
+  $('themeToggle').textContent = document.body.classList.contains('night') ? 'Day mode' : 'Night mode';
+  show('gearBtn'); hide('gearMenu');
   if (myProfile.role === 'admin') startAdmin(); else startClient();
 });
 
@@ -545,18 +579,21 @@ async function loadCases() {
   const clients = (await getDocs(query(collection(db, 'users'), where('role','==','client')))).docs
     .map(d => ({ id: d.id, ...d.data() }));
   const cases = (await getDocs(query(collection(db, 'cases'), where('adminIds','array-contains',me.uid)))).docs.map(d => ({ id: d.id, ...d.data() }));
-  const byClient = Object.fromEntries(cases.map(c => [c.clientId, c]));
+  const byClient = {};
+  for (const k of cases) (byClient[k.clientId] = byClient[k.clientId] || []).push(k);
   el.innerHTML = `<div style="margin-bottom:18px" class="note">${clients.length} client${clients.length===1?'':'s'} · ${cases.length} case${cases.length===1?'':'s'}</div>` +
     (clients.length ? clients.map(c => {
-      const k = byClient[c.id];
-      return `<div class="row"><div><div class="t">${esc(c.name)}</div><div class="s">${esc(c.email)}${k ? ' · '+esc(k.title||'case') : ' · no case yet'}</div></div>
-        <div class="acts">${k
-          ? `<button class="ghost" data-open="${k.id}">Open case</button>`
-          : `<button class="ghost" data-new="${c.id}" data-name="${esc(c.name)}">Create case</button>`}</div></div>`;
+      const list = byClient[c.id] || [];
+      const caseRows = list.map(k => `<div class="s" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px">
+          <span>${esc(k.title||'case')}${k.status?' · '+esc(k.status):''}</span>
+          <button class="ghost" data-open="${k.id}" style="padding:4px 12px;font-size:11px">Open case</button></div>`).join('');
+      return `<div class="row" style="display:block"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.email)}${list.length?'':' · no case yet'}</div>
+        ${caseRows}
+        <div style="margin-top:8px"><button class="ghost" data-new="${c.id}" data-name="${esc(c.name)}" data-n="${list.length+1}" style="padding:4px 12px;font-size:11px">+ New case</button></div></div>`;
     }).join('') : '<div class="empty">No client profiles yet. When a client creates one, it appears here.</div>');
   el.querySelectorAll('[data-new]').forEach(b => b.onclick = async () => {
     const ref = await addDoc(collection(db, 'cases'), {
-      clientId: b.dataset.new, title: `${b.dataset.name} - Home Base`, status: 'Phase one: Presentation',
+      clientId: b.dataset.new, title: `${b.dataset.name} - Home Base` + (b.dataset.n > 1 ? ` ${b.dataset.n}` : ''), status: 'Phase one: Presentation',
       adminIds: [me.uid], createdAt: serverTimestamp()
     });
     await setDoc(doc(db, 'rooms', ref.id), { active: false, currentSlide: 0, presentationId: null, updatedAt: serverTimestamp() });
