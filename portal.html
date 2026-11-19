@@ -230,6 +230,7 @@ body.night #ccHead{border-bottom-color:rgba(181,170,158,.25)}
 <div id="stageView" class="stage-view hidden">
   <button class="ghost leave" id="leaveStage">Leave</button>
   <button class="ghost" id="svChatBtn" style="position:absolute;top:20px;right:104px">Chat</button>
+  <button class="ghost hidden" id="svSound" style="position:absolute;top:20px;left:22px">Sound on</button>
   <p class="caps kicker" id="svKicker"></p>
   <h1 id="svTitle"></h1>
   <p class="body" id="svBody"></p>
@@ -459,7 +460,7 @@ function renderMaterials(el, caseId, canUpload) {
     list.querySelectorAll('[data-dchat]').forEach(b => b.onclick = () => downloadChatFile(caseId, b.dataset.dchat));
   };
   unsub.push(onSnapshot(query(collection(db, 'cases', caseId, 'uploads'), orderBy('createdAt','desc')), snap => {
-    uploads = snap.docs.map(d => ({ id: d.id, ...d.data() })); paint();
+    uploads = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(u => u.kind !== 'ambient'); paint();
   }));
   unsub.push(onSnapshot(query(collection(db, 'cases', caseId, 'messages'), orderBy('createdAt','desc')), snap => {
     chatFiles = snap.docs.filter(d => d.data().hasAttachment)
@@ -545,6 +546,37 @@ function openCallChat(caseId) {
 }
 $('ccClose').onclick = () => hide('callChat');
 
+/* ---------- ambient audio (guided meditation bed) ---------- */
+let ambient = { audio: null, url: null, key: null, unlocked: false };
+async function ambientUrl(caseId, uploadId, mime) {
+  const key = caseId + ':' + uploadId;
+  if (ambient.key !== key || !ambient.url) {
+    ambient.url = await assembleUrl(collection(db, 'cases', caseId, 'uploads', uploadId, 'chunks'), mime || 'audio/mpeg');
+    ambient.key = key;
+    ambient.audio = null;
+  }
+  return ambient.url;
+}
+function ambientEl() {
+  if (!ambient.audio) { ambient.audio = new Audio(); ambient.audio.loop = true; ambient.audio.preload = 'auto'; }
+  return ambient.audio;
+}
+async function ambientApply(caseId, amb) {
+  /* follows the room's ambient state; plays only after a user gesture unlocked sound */
+  const a = ambientEl();
+  if (!amb || !amb.uploadId) { a.pause(); return; }
+  if (!ambient.unlocked) return;
+  const url = await ambientUrl(caseId, amb.uploadId, amb.type);
+  if (a.src !== url) a.src = url;
+  if (amb.playing) {
+    if (amb.at && amb.at.toDate) {
+      const want = (amb.pos || 0) + (Date.now() - amb.at.toDate().getTime()) / 1000;
+      if (isFinite(want) && Math.abs((a.currentTime||0) - want) > 2.5) a.currentTime = want;
+    }
+    a.play().catch(()=>{});
+  } else a.pause();
+}
+
 /* ---------- live presentation viewer ---------- */
 let stageCaseId = null;
 function stopStageVideo() {
@@ -592,6 +624,10 @@ function watchRoom(caseId, isAdminView) {
     const pres = (await getDoc(doc(db, 'presentations', room.presentationId))).data();
     const slides = (await getDocs(query(collection(db, 'presentations', room.presentationId, 'slides'), orderBy('idx','asc')))).docs.map(d=>({id:d.id,...d.data()}));
     if (!slides.length) return;
+    if (room.ambient && room.ambient.uploadId) {
+      if (!ambient.unlocked) show('svSound');
+      ambientApply(caseId, room.ambient);
+    } else { ambientApply(caseId, null); }
     const i = Math.min(room.currentSlide||0, slides.length-1);
     $('svKicker').textContent = pres.title || 'Presentation';
     $('svTitle').textContent = slides[i].title || '';
@@ -609,6 +645,14 @@ function watchRoom(caseId, isAdminView) {
   }));
 }
 $('svChatBtn').onclick = () => openCallChat(stageCaseId);
+$('svSound').onclick = async () => {
+  ambient.unlocked = true;
+  const a = ambientEl();
+  try { await a.play(); a.pause(); } catch(e) {}
+  $('svSound').classList.add('hidden');
+  const room = (await getDoc(doc(db, 'rooms', stageCaseId))).data();
+  ambientApply(stageCaseId, room && room.ambient);
+};
 $('leaveStage').onclick = () => { stopStageVideo(); hide('stageView'); hide('callChat'); };
 
 /* ---------- admin ---------- */
@@ -821,7 +865,17 @@ async function renderSlidesAdmin(el, clientId, caseId) {
           <button class="ghost" data-callchat="1">Chat</button>
         </div>
         <div style="margin-top:4px"><button class="ghost" data-video="1">Open meeting room</button>
-          <div id="vbox-${p.id}" class="vbox hidden"><iframe title="Meeting room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div></div>` : ''}
+          <div id="vbox-${p.id}" class="vbox hidden"><iframe title="Meeting room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div></div>
+        <div style="margin-top:14px;border-top:1px solid rgba(111,99,89,.15);padding-top:10px">
+          <span class="caps" style="font-size:10px">Ambient audio</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+            <button class="ghost" data-ambfile="1" style="padding:4px 12px;font-size:11px">Choose file</button>
+            <button class="ghost" data-ambplay="1" style="padding:4px 12px;font-size:11px">${room.ambient && room.ambient.playing ? 'Stop' : 'Play'}</button>
+            <span class="note" data-ambname="1">${room.ambient && room.ambient.name ? esc(room.ambient.name) : 'no audio yet'}</span>
+          </div>
+          <input type="file" id="ambPick-${p.id}" accept="audio/*" class="hidden">
+          <div class="note" id="ambNote-${p.id}"></div>
+        </div>` : ''}
     </div>`;
   }
   html += `<div class="slideedit">
@@ -895,6 +949,40 @@ async function renderSlidesAdmin(el, clientId, caseId) {
     renderSlidesAdmin(el, clientId, caseId);
   });
   el.querySelectorAll('[data-callchat]').forEach(b => b.onclick = () => openCallChat(caseId));
+  el.querySelectorAll('[data-ambfile]').forEach(b => b.onclick = () => b.closest('.slideedit').querySelector('input[type=file][id^=ambPick]').click());
+  el.querySelectorAll('input[type=file][id^=ambPick]').forEach(inp => inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    const note = inp.parentElement.querySelector('[id^=ambNote]');
+    if (f.size > 8*1024*1024) { note.textContent = 'Keep the audio under 8 MB for now (about 8 minutes at normal quality, more if compressed).'; inp.value=''; return; }
+    try {
+      note.textContent = `Reading ${f.name}...`;
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+      const b64 = btoa(bin);
+      note.textContent = `Storing ${f.name}...`;
+      const upRef = await addDoc(collection(db, 'cases', caseId, 'uploads'), {
+        kind: 'ambient', name: f.name, type: f.type || 'audio/mpeg', size: f.size,
+        uploadedByName: myProfile.name || '', createdAt: serverTimestamp()
+      });
+      await writeChunks(collection(db, 'cases', caseId, 'uploads', upRef.id, 'chunks'), b64);
+      await updateDoc(doc(db, 'rooms', caseId), { ambient: { name: f.name, type: f.type || 'audio/mpeg', uploadId: upRef.id, playing: false, pos: 0, at: null } });
+      ambient.key = null;
+      note.textContent = `${f.name} ready.`;
+      renderSlidesAdmin(el, clientId, caseId);
+    } catch (err) { note.textContent = 'That did not upload. Try again.'; }
+    inp.value = '';
+  });
+  el.querySelectorAll('[data-ambplay]').forEach(b => b.onclick = async () => {
+    const r = (await getDoc(doc(db,'rooms',caseId))).data();
+    const amb = r && r.ambient;
+    if (!amb || !amb.uploadId) { b.parentElement.querySelector('[data-ambname]').textContent = 'choose an audio file first'; return; }
+    const playing = !amb.playing;
+    await updateDoc(doc(db,'rooms',caseId), { ambient: { ...amb, playing, pos: playing ? 0 : (amb.pos||0), at: playing ? serverTimestamp() : null } });
+    ambient.unlocked = true;
+    ambientApply(caseId, { ...amb, playing, pos: 0, at: playing ? { toDate: () => new Date() } : null });
+    b.textContent = playing ? 'Stop' : 'Play';
+  });
   el.querySelectorAll('[data-video]').forEach(b => b.onclick = async () => {
     const box = b.parentElement.querySelector('.vbox'); const frame = box.querySelector('iframe');
     if (box.classList.contains('hidden')) {
