@@ -30,13 +30,14 @@ body{
     radial-gradient(130% 95% at 50% 26%, #fbfaf7 0%, var(--ghosted) 58%, #d8d3cc 100%);
   font-family:'Mulish',system-ui,sans-serif;
   color:var(--diesel);
+  overflow:hidden;
 }
 .stage{
   padding:48px 24px;
   text-align:center;
 }
 .mark{
-  width:min(72vw,320px);
+  width:min(66vw,300px);
   margin:0 auto;
   animation:rise 1.5s cubic-bezier(.22,.75,.25,1) both .15s;
 }
@@ -55,10 +56,13 @@ body{
   fill:var(--morel);
 }
 .rule{stroke:var(--morel);stroke-width:1.1}
+.stage{position:relative;transform:translateY(-6vh)}
 .reflection{
-  width:min(72vw,320px);
-  margin:10px auto 0;
-  transform:scaleY(-1);
+  position:absolute;
+  top:calc(100% + 10px);
+  left:50%;
+  width:min(66vw,300px);
+  transform:translateX(-50%) scaleY(-1);
   -webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.24), rgba(0,0,0,0) 52%);
   mask-image:linear-gradient(to bottom, rgba(0,0,0,.24), rgba(0,0,0,0) 52%);
   pointer-events:none;
@@ -68,10 +72,9 @@ body{
   from{opacity:0;transform:translateY(16px)}
   to{opacity:1;transform:translateY(0)}
 }
-.reflection{transform-origin:center}
 @keyframes rise-reflect{
-  from{opacity:0;transform:scaleY(-1) translateY(16px)}
-  to{opacity:1;transform:scaleY(-1) translateY(0)}
+  from{opacity:0;transform:translateX(-50%) scaleY(-1) translateY(16px)}
+  to{opacity:1;transform:translateX(-50%) scaleY(-1) translateY(0)}
 }
 .reflection{animation-name:rise-reflect}
 @media (prefers-reduced-motion: reduce){
@@ -84,27 +87,27 @@ body{
   <div class="mark" role="img" aria-label="The Home Base Collective">
     <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <path id="hb-top-r" d="M 36.5,100 A 63.5,63.5 0 0 1 163.5,100" fill="none"/>
-        <path id="hb-bot-r" d="M 29.3,100 A 70.7,70.7 0 0 0 170.7,100" fill="none"/>
+        <path id="hb-top" d="M 36.5,100 A 63.5,63.5 0 0 1 163.5,100" fill="none"/>
+        <path id="hb-bot" d="M 29.3,100 A 70.7,70.7 0 0 0 170.7,100" fill="none"/>
       </defs>
-      <text class="arc"><textPath href="#hb-top-r" startOffset="50%" text-anchor="middle">THE HOME BASE</textPath></text>
-      <text class="arc arc-b"><textPath href="#hb-bot-r" startOffset="50%" text-anchor="middle">COLLECTIVE</textPath></text>
-      <text class="mono" x="65" y="116" text-anchor="middle">H</text>
+      <text class="arc"><textPath href="#hb-top" startOffset="50%" text-anchor="middle">THE HOME BASE</textPath></text>
+      <text class="arc arc-b"><textPath href="#hb-bot" startOffset="50%" text-anchor="middle">COLLECTIVE</textPath></text>
+      <text class="mono" x="72.5" y="116" text-anchor="middle">H</text>
       <line class="rule" x1="100" y1="63.5" x2="100" y2="136.5"/>
-      <text class="mono" x="120" y="116" text-anchor="middle">B</text>
+      <text class="mono" x="127.5" y="116" text-anchor="middle">B</text>
     </svg>
   </div>
   <div class="reflection" aria-hidden="true">
     <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <path id="hb-top-r" d="M 28,100 A 72,72 0 0 1 172,100" fill="none"/>
-        <path id="hb-bot-r" d="M 31,100 A 69,69 0 0 0 169,100" fill="none"/>
+        <path id="hb-top-r" d="M 36.5,100 A 63.5,63.5 0 0 1 163.5,100" fill="none"/>
+        <path id="hb-bot-r" d="M 29.3,100 A 70.7,70.7 0 0 0 170.7,100" fill="none"/>
       </defs>
       <text class="arc"><textPath href="#hb-top-r" startOffset="50%" text-anchor="middle">THE HOME BASE</textPath></text>
       <text class="arc arc-b"><textPath href="#hb-bot-r" startOffset="50%" text-anchor="middle">COLLECTIVE</textPath></text>
-      <text class="mono" x="77" y="115" text-anchor="middle">H</text>
-      <line class="rule" x1="100" y1="80" x2="100" y2="118"/>
-      <text class="mono" x="123" y="115" text-anchor="middle">B</text>
+      <text class="mono" x="72.5" y="116" text-anchor="middle">H</text>
+      <line class="rule" x1="100" y1="63.5" x2="100" y2="136.5"/>
+      <text class="mono" x="127.5" y="116" text-anchor="middle">B</text>
     </svg>
   </div>
 </main>
