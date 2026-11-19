@@ -615,8 +615,23 @@ async function joinStageMeeting(audioOnly) {
 }
 $('svVideoBtn').onclick = () => joinStageMeeting(false);
 $('svAudioBtn').onclick = () => joinStageMeeting(true);
+let ambientWatched = null;
+function watchAmbient(caseId) {
+  if (ambientWatched === caseId) return;
+  ambientWatched = caseId;
+  unsub.push(onSnapshot(doc(db, 'rooms', caseId), snap => {
+    if (window.__activeCase && window.__activeCase !== caseId) return;
+    const room = snap.exists() ? snap.data() : null;
+    const amb = room && room.ambient;
+    if (amb && amb.uploadId) {
+      if (!ambient.unlocked) show('svSound');
+      ambientApply(caseId, amb);
+    } else ambientApply(caseId, null);
+  }));
+}
 function watchRoom(caseId, isAdminView) {
   stageCaseId = caseId;
+  watchAmbient(caseId);
   unsub.push(onSnapshot(doc(db, 'rooms', caseId), async snap => {
     if (window.__activeCase && window.__activeCase !== caseId) return;
     const room = snap.exists() ? snap.data() : null;
@@ -624,10 +639,6 @@ function watchRoom(caseId, isAdminView) {
     const pres = (await getDoc(doc(db, 'presentations', room.presentationId))).data();
     const slides = (await getDocs(query(collection(db, 'presentations', room.presentationId, 'slides'), orderBy('idx','asc')))).docs.map(d=>({id:d.id,...d.data()}));
     if (!slides.length) return;
-    if (room.ambient && room.ambient.uploadId) {
-      if (!ambient.unlocked) show('svSound');
-      ambientApply(caseId, room.ambient);
-    } else { ambientApply(caseId, null); }
     const i = Math.min(room.currentSlide||0, slides.length-1);
     $('svKicker').textContent = pres.title || 'Presentation';
     $('svTitle').textContent = slides[i].title || '';
@@ -648,7 +659,7 @@ $('svChatBtn').onclick = () => openCallChat(stageCaseId);
 $('svSound').onclick = async () => {
   ambient.unlocked = true;
   const a = ambientEl();
-  try { await a.play(); a.pause(); } catch(e) {}
+  try { a.play().then(() => a.pause()).catch(() => {}); } catch(e) {}
   $('svSound').classList.add('hidden');
   const room = (await getDoc(doc(db, 'rooms', stageCaseId))).data();
   ambientApply(stageCaseId, room && room.ambient);
