@@ -276,7 +276,10 @@ function renderChat(el, caseId, phase, canPost) {
       if (f.size > 8*1024*1024) { note.textContent = 'Keep files under 8 MB for now.'; return; }
       note.textContent = `Reading ${f.name}...`;
       try {
-        const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
+        const bytes = new Uint8Array(await f.arrayBuffer());
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+        const b64 = btoa(bin);
         note.textContent = `Posting ${f.name}...`;
         const msgRef = await addDoc(collection(db, 'cases', caseId, 'messages'), {
           phase, body: '', senderId: me.uid, senderName: myProfile.name,
