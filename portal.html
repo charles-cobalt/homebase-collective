@@ -152,11 +152,9 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
     <p class="note" id="clientSub"></p>
     <div class="tabs" id="clientTabs">
       <button data-tab="reflection" class="on">Reflection</button>
-      <button data-tab="presentation">Presentation</button>
       <button data-tab="materials">Materials</button>
     </div>
     <div id="ctab-reflection"></div>
-    <div id="ctab-presentation" class="hidden"></div>
     <div id="ctab-materials" class="hidden"></div>
   </section>
 
@@ -388,21 +386,20 @@ function startClient() {
     if (snap.empty) {
       $('clientTitle').textContent = 'Your home base is being prepared';
       $('clientSub').textContent = 'The studio is setting up your case. Check back soon, or write to hello@thehomebasecollective.com.';
-      $('ctab-reflection').innerHTML = ''; $('ctab-presentation').innerHTML=''; $('ctab-materials').innerHTML='';
+      $('ctab-reflection').innerHTML = ''; $('ctab-materials').innerHTML='';
       return;
     }
     myCase = { id: snap.docs[0].id, ...snap.docs[0].data() };
     $('clientTitle').textContent = myCase.title || 'Your case';
     $('clientSub').textContent = myCase.status ? `Status: ${myCase.status}` : '';
     renderChat($('ctab-reflection'), myCase.id, 'reflection', true);
-    renderChat($('ctab-presentation'), myCase.id, 'presentation', true);
     renderMaterials($('ctab-materials'), myCase.id, false);
     watchRoom(myCase.id, false);
   }));
   $('clientTabs').onclick = e => {
     if (!e.target.dataset.tab) return;
     document.querySelectorAll('#clientTabs button').forEach(b => b.classList.toggle('on', b===e.target));
-    ['reflection','presentation','materials'].forEach(t => $(`ctab-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
+    ['reflection','materials'].forEach(t => $(`ctab-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
   };
 }
 
@@ -477,12 +474,10 @@ async function openAdminCase(caseId) {
       <div class="note" id="teamNote"></div></div>
     <div class="tabs" id="acTabs">
       <button data-tab="reflection">Reflection</button>
-      <button data-tab="presentation">Presentation</button>
       <button data-tab="materials">Materials</button>
       <button data-tab="slides">Slides & live</button>
     </div>
     <div id="ac-reflection"></div>
-    <div id="ac-presentation" class="hidden"></div>
     <div id="ac-materials" class="hidden"></div>
     <div id="ac-slides" class="hidden"></div>
     <div style="margin-top:26px"><button class="ghost" id="backToCases">&larr; All cases</button></div>`;
@@ -492,10 +487,9 @@ async function openAdminCase(caseId) {
   $('acTabs').onclick = e => {
     if (!e.target.dataset.tab) return;
     document.querySelectorAll('#acTabs button').forEach(b => b.classList.toggle('on', b===e.target));
-    ['reflection','presentation','materials','slides'].forEach(t => $(`ac-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
+    ['reflection','materials','slides'].forEach(t => $(`ac-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
   };
   renderChat($('ac-reflection'), caseId, 'reflection', true);
-  renderChat($('ac-presentation'), caseId, 'presentation', true);
   renderMaterials($('ac-materials'), caseId, true);
   renderTeam(caseId);
   renderSlidesAdmin($('ac-slides'), adminCase.clientId, caseId);
