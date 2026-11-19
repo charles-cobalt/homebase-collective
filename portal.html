@@ -194,8 +194,9 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
   <p class="body" id="svBody"></p>
   <div class="count" id="svCount"></div>
   <div class="stagevideo">
-    <button class="ghost" id="svVideoBtn">Join video room</button>
-    <div id="svVideoBox" class="hidden"><iframe id="svVideoFrame" title="Video room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div>
+    <button class="ghost" id="svVideoBtn">Join meeting room</button>
+    <button class="ghost" id="svAudioBtn">Join audio only</button>
+    <div id="svVideoBox" class="hidden"><iframe id="svVideoFrame" title="Meeting room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div>
   </div>
 </div>
 
@@ -204,7 +205,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, onSnapshot, getDocs, serverTimestamp, updateDoc }
+import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit as limitFs, onSnapshot, getDocs, serverTimestamp, updateDoc }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const app = initializeApp(firebaseConfig);
@@ -292,7 +293,8 @@ function renderChat(el, caseId, phase, canPost) {
         const chip = m.hasAttachment ? `<div class="filechip"><span>${esc(m.attachment.name)} · ${(m.attachment.size/1024).toFixed(0)} KB</span>
           ${(m.attachment.type||'').startsWith('image/') ? `<button class="ghost" data-cview="${d.id}">View</button>` : ''}
           <button class="ghost" data-cdl="${d.id}">Download</button></div>` : '';
-        return `<div class="msg ${m.senderId===me.uid?'mine':'theirs'}"><div class="who">${esc(m.senderName||'')}</div>${m.body ? esc(m.body) : ''}${chip}</div>`;
+        const when = m.createdAt && m.createdAt.toDate ? m.createdAt.toDate().toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '';
+        return `<div class="msg ${m.senderId===me.uid?'mine':'theirs'}"><div class="who">${esc(m.senderName||'')}${when ? ' · ' + when : ''}</div>${m.body ? esc(m.body) : ''}${chip}</div>`;
       }).join('');
       log.querySelectorAll('[data-cview]').forEach(b => b.onclick = () => viewChatFile(caseId, b.dataset.cview));
       log.querySelectorAll('[data-cdl]').forEach(b => b.onclick = () => downloadChatFile(caseId, b.dataset.cdl));
@@ -454,13 +456,40 @@ function startClient() {
 let stageCaseId = null;
 function stopStageVideo() {
   const f = $('svVideoFrame'); if (f) f.src = 'about:blank';
-  hide('svVideoBox'); show('svVideoBtn');
+  hide('svVideoBox'); show('svVideoBtn'); show('svAudioBtn');
 }
-$('svVideoBtn').onclick = () => {
+async function claimVideoRoom(caseId) { /* admin: claims a pool room for the case, returns guest + host links */
+  const caseRef = doc(db, 'cases', caseId);
+  const c = (await getDoc(caseRef)).data();
+  if (c && c.videoRoomUrl) {
+    let host = null;
+    if (c.videoPoolId) { try { const pd = (await getDoc(doc(db, 'videoPool', c.videoPoolId))).data(); host = pd && pd.hostUrl; } catch(e) {} }
+    return { guest: c.videoRoomUrl, host: host || c.videoRoomUrl };
+  }
+  const free = await getDocs(query(collection(db, 'videoPool'), where('assigned','==',null), limitFs(1)));
+  if (free.empty) return null;
+  const d = free.docs[0].data();
+  await updateDoc(doc(db, 'videoPool', free.docs[0].id), { assigned: caseId, assignedAt: serverTimestamp() });
+  await updateDoc(caseRef, { videoRoomUrl: d.url, videoPoolId: free.docs[0].id });
+  return { guest: d.url, host: d.hostUrl || d.url };
+}
+async function caseGuestRoom(caseId) { /* client: guest link only, set by the studio */
+  const c = (await getDoc(doc(db, 'cases', caseId))).data();
+  return (c && c.videoRoomUrl) || null;
+}
+function videoEmbedUrl(roomUrl, name, audioOnly) {
+  return roomUrl + '?embed&displayName=' + encodeURIComponent(name || '') + (audioOnly ? '&video=off' : '');
+}
+async function joinStageMeeting(audioOnly) {
   if (!stageCaseId) return;
-  $('svVideoFrame').src = 'https://meet.jit.si/homebase-collective-' + stageCaseId;
-  show('svVideoBox'); hide('svVideoBtn');
-};
+  const btn = audioOnly ? $('svAudioBtn') : $('svVideoBtn');
+  const url = await caseGuestRoom(stageCaseId);
+  if (!url) { btn.textContent = 'The studio opens the meeting room when your meeting begins'; return; }
+  $('svVideoFrame').src = videoEmbedUrl(url, myProfile && myProfile.name, audioOnly);
+  show('svVideoBox'); hide('svVideoBtn'); hide('svAudioBtn');
+}
+$('svVideoBtn').onclick = () => joinStageMeeting(false);
+$('svAudioBtn').onclick = () => joinStageMeeting(true);
 function watchRoom(caseId, isAdminView) {
   stageCaseId = caseId;
   unsub.push(onSnapshot(doc(db, 'rooms', caseId), async snap => {
@@ -540,7 +569,7 @@ async function openAdminCase(caseId) {
     <div class="tabs" id="acTabs">
       <button data-tab="reflection">Reflection</button>
       <button data-tab="materials">Materials</button>
-      <button data-tab="slides">Slides & live</button>
+      <button data-tab="slides">Presentation</button>
     </div>
     <div id="ac-reflection"></div>
     <div id="ac-materials" class="hidden"></div>
@@ -618,8 +647,8 @@ async function renderSlidesAdmin(el, clientId, caseId) {
           <span class="caps" id="livepos"></span>
           <button data-next="${p.id}">Next &rarr;</button>
         </div>
-        <div style="margin-top:4px"><button class="ghost" data-video="1">Open video room</button>
-          <div id="vbox-${p.id}" class="vbox hidden"><iframe title="Video room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div></div>` : ''}
+        <div style="margin-top:4px"><button class="ghost" data-video="1">Open meeting room</button>
+          <div id="vbox-${p.id}" class="vbox hidden"><iframe title="Meeting room" allow="camera; microphone; autoplay; clipboard-write; display-capture; fullscreen"></iframe></div></div>` : ''}
     </div>`;
   }
   html += `<div class="slideedit">
@@ -662,13 +691,16 @@ async function renderSlidesAdmin(el, clientId, caseId) {
     await setDoc(doc(db,'rooms',caseId), { active: false, presentationId: null, currentSlide: 0, updatedAt: serverTimestamp() });
     renderSlidesAdmin(el, clientId, caseId);
   });
-  el.querySelectorAll('[data-video]').forEach(b => b.onclick = () => {
+  el.querySelectorAll('[data-video]').forEach(b => b.onclick = async () => {
     const box = b.parentElement.querySelector('.vbox'); const frame = box.querySelector('iframe');
     if (box.classList.contains('hidden')) {
-      frame.src = 'https://meet.jit.si/homebase-collective-' + caseId;
-      box.classList.remove('hidden'); b.textContent = 'Close video room';
+      b.textContent = 'Opening...';
+      const room = await claimVideoRoom(caseId);
+      if (!room) { b.textContent = 'No meeting rooms left in the pool - tell the studio'; return; }
+      frame.src = videoEmbedUrl(room.host, myProfile && myProfile.name);
+      box.classList.remove('hidden'); b.textContent = 'Close meeting room';
     } else {
-      frame.src = 'about:blank'; box.classList.add('hidden'); b.textContent = 'Open video room';
+      frame.src = 'about:blank'; box.classList.add('hidden'); b.textContent = 'Open meeting room';
     }
   });
   el.querySelectorAll('[data-prev]').forEach(b => b.onclick = async () => {
