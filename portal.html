@@ -596,10 +596,16 @@ async function openAdminCase(caseId) {
       <button data-tab="reflection">Reflection</button>
       <button data-tab="materials">Materials</button>
       <button data-tab="slides">Presentation</button>
+      <button data-tab="transform">Transformation</button>
     </div>
     <div id="ac-reflection"></div>
     <div id="ac-materials" class="hidden"></div>
     <div id="ac-slides" class="hidden"></div>
+    <div id="ac-transform" class="hidden">
+      <div class="slideedit"><div class="t serif" style="font-size:19px;margin-bottom:8px">Transformation</div>
+        <div class="note">Transformation is a page where admins can instruct clients and give them reminders - daily reminders, weekly reminders, daily affirmations, weekly affirmations.</div>
+        <div class="empty" style="margin-top:12px">Coming soon.</div></div>
+    </div>
     <div style="margin-top:34px;border-top:1px solid rgba(111,99,89,.2);padding-top:14px">
       <button class="ghost" id="caseDel">Delete case</button>
       <div class="note hidden" id="caseDelBox" style="margin:8px 0">Delete this case, its reflection room, materials and presentations for everyone? This cannot be undone.
@@ -644,7 +650,7 @@ async function openAdminCase(caseId) {
   $('acTabs').onclick = e => {
     if (!e.target.dataset.tab) return;
     document.querySelectorAll('#acTabs button').forEach(b => b.classList.toggle('on', b===e.target));
-    ['reflection','materials','slides'].forEach(t => $(`ac-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
+    ['reflection','materials','slides','transform'].forEach(t => $(`ac-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
   };
   renderChat($('ac-reflection'), caseId, 'reflection', true);
   renderMaterials($('ac-materials'), caseId, true);
