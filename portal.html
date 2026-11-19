@@ -274,14 +274,16 @@ function renderChat(el, caseId, phase, canPost) {
       const f = e.target.files[0]; if (!f) return;
       const note = $(`attnote-${phase}`);
       if (f.size > 8*1024*1024) { note.textContent = 'Keep files under 8 MB for now.'; return; }
-      note.textContent = `Sending ${f.name}...`;
+      note.textContent = `Reading ${f.name}...`;
       try {
         const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
+        note.textContent = `Posting ${f.name}...`;
         const msgRef = await addDoc(collection(db, 'cases', caseId, 'messages'), {
           phase, body: '', senderId: me.uid, senderName: myProfile.name,
           hasAttachment: true, attachment: { name: f.name, type: f.type || 'application/octet-stream', size: f.size },
           createdAt: serverTimestamp()
         });
+        note.textContent = `Storing ${f.name}...`;
         await writeChunks(collection(db, 'cases', caseId, 'messages', msgRef.id, 'chunks'), b64);
         note.textContent = '';
       } catch (err) { note.textContent = 'That did not send. Try again.'; }
