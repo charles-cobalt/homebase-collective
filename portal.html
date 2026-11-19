@@ -70,6 +70,13 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
 .msg.theirs{align-self:flex-start;background:rgba(255,255,255,.8);border:1px solid rgba(181,170,158,.5)}
 .chatbox{display:flex;gap:10px;margin-top:8px}
 .chatbox input{flex:1}
+.msg .filechip{display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 12px;border:1px solid rgba(181,170,158,.55);font-family:'Montserrat',sans-serif;font-size:11px;letter-spacing:.05em}
+.msg.mine .filechip{border-color:rgba(255,255,255,.35)}
+.msg .filechip button{padding:2px 8px;font-size:10px}
+.teamline{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px}
+.teamchip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid rgba(181,170,158,.5);font-size:13px;background:rgba(255,255,255,.55)}
+.teamchip button{border:none;background:none;padding:0;color:var(--morel);cursor:pointer;font-size:14px;line-height:1}
+.matkind{font-family:'Montserrat',sans-serif;font-size:9px;letter-spacing:.18em;color:var(--morel)}
 .empty{color:var(--morel);font-size:14px;padding:26px 0;text-align:center;font-style:italic;font-family:'Noto Serif Display',serif}
 
 /* lists */
@@ -146,11 +153,11 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
     <div class="tabs" id="clientTabs">
       <button data-tab="reflection" class="on">Reflection</button>
       <button data-tab="presentation">Presentation</button>
-      <button data-tab="files">Files</button>
+      <button data-tab="materials">Materials</button>
     </div>
     <div id="ctab-reflection"></div>
     <div id="ctab-presentation" class="hidden"></div>
-    <div id="ctab-files" class="hidden"></div>
+    <div id="ctab-materials" class="hidden"></div>
   </section>
 
   <!-- ADMIN -->
@@ -236,7 +243,8 @@ onAuthStateChanged(auth, async user => {
 /* ---------- chat (shared) ---------- */
 function renderChat(el, caseId, phase, canPost) {
   el.innerHTML = `<div class="chatlog" id="log-${phase}"><div class="spin">Listening...</div></div>
-    ${canPost ? `<div class="chatbox"><input id="in-${phase}" placeholder="Write a note..." autocomplete="off"><button class="solid" id="send-${phase}">Send</button></div>` : ''}`;
+    ${canPost ? `<div class="chatbox"><input id="in-${phase}" placeholder="Write a note..." autocomplete="off"><button class="ghost" id="att-${phase}" title="Send a photo or document">Attach</button><button class="solid" id="send-${phase}">Send</button></div>
+    <input type="file" id="attfile-${phase}" class="hidden"><div class="note" id="attnote-${phase}"></div>` : ''}`;
   const log = $(`log-${phase}`);
   unsub.push(onSnapshot(
     query(collection(db, 'cases', caseId, 'messages'), where('phase','==',phase), orderBy('createdAt','asc')),
@@ -244,8 +252,13 @@ function renderChat(el, caseId, phase, canPost) {
       if (snap.empty) { log.innerHTML = `<div class="empty">${phase==='reflection' ? 'The reflection room is quiet for now.' : 'Nothing here yet.'}</div>`; return; }
       log.innerHTML = snap.docs.map(d => {
         const m = d.data();
-        return `<div class="msg ${m.senderId===me.uid?'mine':'theirs'}"><div class="who">${esc(m.senderName||'')}</div>${esc(m.body)}</div>`;
+        const chip = m.hasAttachment ? `<div class="filechip"><span>${esc(m.attachment.name)} · ${(m.attachment.size/1024).toFixed(0)} KB</span>
+          ${(m.attachment.type||'').startsWith('image/') ? `<button class="ghost" data-cview="${d.id}">View</button>` : ''}
+          <button class="ghost" data-cdl="${d.id}">Download</button></div>` : '';
+        return `<div class="msg ${m.senderId===me.uid?'mine':'theirs'}"><div class="who">${esc(m.senderName||'')}</div>${m.body ? esc(m.body) : ''}${chip}</div>`;
       }).join('');
+      log.querySelectorAll('[data-cview]').forEach(b => b.onclick = () => viewChatFile(caseId, b.dataset.cview));
+      log.querySelectorAll('[data-cdl]').forEach(b => b.onclick = () => downloadChatFile(caseId, b.dataset.cdl));
       log.scrollTop = log.scrollHeight;
     }));
   if (canPost) {
@@ -258,21 +271,97 @@ function renderChat(el, caseId, phase, canPost) {
     };
     $(`send-${phase}`).onclick = send;
     $(`in-${phase}`).addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+    $(`att-${phase}`).onclick = () => $(`attfile-${phase}`).click();
+    $(`attfile-${phase}`).onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      const note = $(`attnote-${phase}`);
+      if (f.size > 8*1024*1024) { note.textContent = 'Keep files under 8 MB for now.'; return; }
+      note.textContent = `Sending ${f.name}...`;
+      try {
+        const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
+        const msgRef = await addDoc(collection(db, 'cases', caseId, 'messages'), {
+          phase, body: '', senderId: me.uid, senderName: myProfile.name,
+          hasAttachment: true, attachment: { name: f.name, type: f.type || 'application/octet-stream', size: f.size },
+          createdAt: serverTimestamp()
+        });
+        await writeChunks(collection(db, 'cases', caseId, 'messages', msgRef.id, 'chunks'), b64);
+        note.textContent = '';
+      } catch (err) { note.textContent = 'That did not send. Try again.'; }
+      e.target.value = '';
+    };
   }
 }
 
-/* ---------- files (shared read; admin upload) ---------- */
-async function renderFiles(el, caseId, canUpload) {
-  el.innerHTML = `<div id="filelist"><div class="spin">Loading files...</div></div>
+/* ---------- shared chunked-file helpers (Firestore, ~8MB cap) ---------- */
+async function writeChunks(colRef, b64) {
+  const CH = 700000;
+  const parts = [];
+  for (let i = 0; i < b64.length; i += CH) parts.push(b64.slice(i, i+CH));
+  for (let i = 0; i < parts.length; i++)
+    await setDoc(doc(colRef, String(i).padStart(4,'0')), { i, data: parts[i] });
+  return parts.length;
+}
+async function assembleUrl(colRef, type) {
+  const snap = await getDocs(query(colRef, orderBy('i','asc')));
+  const b64 = snap.docs.map(d => d.data().data).join('');
+  const bin = atob(b64); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: type || 'application/octet-stream' }));
+}
+function saveUrl(url, name) {
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+async function downloadChatFile(caseId, mid) {
+  const m = (await getDoc(doc(db, 'cases', caseId, 'messages', mid))).data();
+  saveUrl(await assembleUrl(collection(db, 'cases', caseId, 'messages', mid, 'chunks'), m.attachment.type), m.attachment.name);
+}
+async function viewChatFile(caseId, mid) {
+  const m = (await getDoc(doc(db, 'cases', caseId, 'messages', mid))).data();
+  window.open(await assembleUrl(collection(db, 'cases', caseId, 'messages', mid, 'chunks'), m.attachment.type), '_blank');
+}
+async function downloadUpload(caseId, upId) {
+  const u = (await getDoc(doc(db, 'cases', caseId, 'uploads', upId))).data();
+  saveUrl(await assembleUrl(collection(db, 'cases', caseId, 'uploads', upId, 'chunks'), u.type), u.name);
+}
+async function viewUpload(caseId, upId) {
+  const u = (await getDoc(doc(db, 'cases', caseId, 'uploads', upId))).data();
+  window.open(await assembleUrl(collection(db, 'cases', caseId, 'uploads', upId, 'chunks'), u.type), '_blank');
+}
+
+/* ---------- materials: every asset for the case in one place ---------- */
+function renderMaterials(el, caseId, canUpload) {
+  el.innerHTML = `<div id="matlist"><div class="spin">Loading materials...</div></div>
     ${canUpload ? `<div style="margin-top:16px"><input type="file" id="upFile" class="hidden"><button id="upBtn">Upload a file</button> <span class="note" id="upNote"></span></div>` : ''}`;
-  const list = $('filelist');
-  unsub.push(onSnapshot(query(collection(db, 'cases', caseId, 'uploads'), orderBy('createdAt','desc')), snap => {
-    list.innerHTML = snap.empty ? '<div class="empty">No files yet.</div>' : snap.docs.map(d => {
-      const u = d.data();
-      return `<div class="row"><div><div class="t">${esc(u.name)}</div><div class="s">${(u.size/1024).toFixed(0)} KB · ${esc(u.uploadedByName||'')}</div></div>
-        <div class="acts"><button class="ghost" data-dl="${d.id}">Download</button></div></div>`;
+  const list = $('matlist');
+  let uploads = [], chatFiles = [];
+  const paint = () => {
+    const items = [
+      ...uploads.map(u => ({ ...u, kind: 'upload' })),
+      ...chatFiles
+    ].sort((a,b) => ((b.createdAt||{}).seconds||0) - ((a.createdAt||{}).seconds||0));
+    if (!items.length) { list.innerHTML = '<div class="empty">Nothing shared yet. Photos and documents from the case chats and studio uploads gather here.</div>'; return; }
+    list.innerHTML = items.map(it => {
+      const isImg = (it.type||'').startsWith('image/');
+      const who = it.kind==='upload' ? (it.uploadedByName||'') : (it.senderName||'');
+      const when = it.createdAt && it.createdAt.toDate ? it.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      return `<div class="row"><div><div class="t">${esc(it.name)}</div>
+        <div class="s"><span class="matkind">${isImg?'IMAGE':'DOC'}</span> · ${(it.size/1024).toFixed(0)} KB · ${esc(who)}${when?' · '+when:''}</div></div>
+        <div class="acts">${isImg ? `<button class="ghost" data-v${it.kind}="${it.id}">View</button>` : ''}
+        <button class="ghost" data-d${it.kind}="${it.id}">Download</button></div></div>`;
     }).join('');
-    list.querySelectorAll('[data-dl]').forEach(b => b.onclick = () => downloadFile(caseId, b.dataset.dl));
+    list.querySelectorAll('[data-vupload]').forEach(b => b.onclick = () => viewUpload(caseId, b.dataset.vupload));
+    list.querySelectorAll('[data-dupload]').forEach(b => b.onclick = () => downloadUpload(caseId, b.dataset.dupload));
+    list.querySelectorAll('[data-vchat]').forEach(b => b.onclick = () => viewChatFile(caseId, b.dataset.vchat));
+    list.querySelectorAll('[data-dchat]').forEach(b => b.onclick = () => downloadChatFile(caseId, b.dataset.dchat));
+  };
+  unsub.push(onSnapshot(query(collection(db, 'cases', caseId, 'uploads'), orderBy('createdAt','desc')), snap => {
+    uploads = snap.docs.map(d => ({ id: d.id, ...d.data() })); paint();
+  }));
+  unsub.push(onSnapshot(query(collection(db, 'cases', caseId, 'messages'), orderBy('createdAt','desc')), snap => {
+    chatFiles = snap.docs.filter(d => d.data().hasAttachment)
+      .map(d => ({ id: d.id, kind: 'chat', ...d.data().attachment, senderName: d.data().senderName, createdAt: d.data().createdAt }));
+    paint();
   }));
   if (canUpload) {
     $('upBtn').onclick = () => $('upFile').click();
@@ -281,29 +370,14 @@ async function renderFiles(el, caseId, canUpload) {
       if (f.size > 8*1024*1024) { $('upNote').textContent = 'Keep files under 8 MB for now.'; return; }
       $('upNote').textContent = 'Uploading...';
       const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
-      const CH = 700000;
-      const chunks = [];
-      for (let i = 0; i < b64.length; i += CH) chunks.push(b64.slice(i, i+CH));
-      const upRef = await addDoc(collection(db, 'cases', caseId, 'uploads'), {
-        name: f.name, type: f.type, size: f.size, chunks: chunks.length,
+      await addDoc(collection(db, 'cases', caseId, 'uploads'), {
+        name: f.name, type: f.type, size: f.size,
         uploadedBy: me.uid, uploadedByName: myProfile.name, createdAt: serverTimestamp()
-      });
-      for (let i = 0; i < chunks.length; i++)
-        await setDoc(doc(db, 'cases', caseId, 'uploads', upRef.id, 'chunks', String(i).padStart(4,'0')), { i, data: chunks[i] });
+      }).then(async upRef => { await writeChunks(collection(db, 'cases', caseId, 'uploads', upRef.id, 'chunks'), b64); });
       $('upNote').textContent = 'Uploaded.';
       e.target.value = '';
     };
   }
-}
-async function downloadFile(caseId, upId) {
-  const meta = (await getDoc(doc(db, 'cases', caseId, 'uploads', upId))).data();
-  const snap = await getDocs(query(collection(db, 'cases', caseId, 'uploads', upId, 'chunks'), orderBy('i','asc')));
-  const b64 = snap.docs.map(d => d.data().data).join('');
-  const bin = atob(b64); const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  const url = URL.createObjectURL(new Blob([bytes], { type: meta.type || 'application/octet-stream' }));
-  const a = document.createElement('a'); a.href = url; a.download = meta.name; a.click();
-  URL.revokeObjectURL(url);
 }
 
 /* ---------- client ---------- */
@@ -314,7 +388,7 @@ function startClient() {
     if (snap.empty) {
       $('clientTitle').textContent = 'Your home base is being prepared';
       $('clientSub').textContent = 'The studio is setting up your case. Check back soon, or write to hello@thehomebasecollective.com.';
-      $('ctab-reflection').innerHTML = ''; $('ctab-presentation').innerHTML=''; $('ctab-files').innerHTML='';
+      $('ctab-reflection').innerHTML = ''; $('ctab-presentation').innerHTML=''; $('ctab-materials').innerHTML='';
       return;
     }
     myCase = { id: snap.docs[0].id, ...snap.docs[0].data() };
@@ -322,13 +396,13 @@ function startClient() {
     $('clientSub').textContent = myCase.status ? `Status: ${myCase.status}` : '';
     renderChat($('ctab-reflection'), myCase.id, 'reflection', true);
     renderChat($('ctab-presentation'), myCase.id, 'presentation', true);
-    renderFiles($('ctab-files'), myCase.id, false);
+    renderMaterials($('ctab-materials'), myCase.id, false);
     watchRoom(myCase.id, false);
   }));
   $('clientTabs').onclick = e => {
     if (!e.target.dataset.tab) return;
     document.querySelectorAll('#clientTabs button').forEach(b => b.classList.toggle('on', b===e.target));
-    ['reflection','presentation','files'].forEach(t => $(`ctab-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
+    ['reflection','presentation','materials'].forEach(t => $(`ctab-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
   };
 }
 
@@ -361,7 +435,7 @@ async function loadCases() {
   el.innerHTML = '<div class="spin">Loading...</div>';
   const clients = (await getDocs(query(collection(db, 'users'), where('role','==','client')))).docs
     .map(d => ({ id: d.id, ...d.data() }));
-  const cases = (await getDocs(collection(db, 'cases'))).docs.map(d => ({ id: d.id, ...d.data() }));
+  const cases = (await getDocs(query(collection(db, 'cases'), where('adminIds','array-contains',me.uid)))).docs.map(d => ({ id: d.id, ...d.data() }));
   const byClient = Object.fromEntries(cases.map(c => [c.clientId, c]));
   el.innerHTML = `<div style="margin-bottom:18px" class="note">${clients.length} client${clients.length===1?'':'s'} · ${cases.length} case${cases.length===1?'':'s'}</div>` +
     (clients.length ? clients.map(c => {
@@ -373,7 +447,8 @@ async function loadCases() {
     }).join('') : '<div class="empty">No client profiles yet. When a client creates one, it appears here.</div>');
   el.querySelectorAll('[data-new]').forEach(b => b.onclick = async () => {
     const ref = await addDoc(collection(db, 'cases'), {
-      clientId: b.dataset.new, title: `${b.dataset.name} - Home Base`, status: 'Phase one: Presentation', createdAt: serverTimestamp()
+      clientId: b.dataset.new, title: `${b.dataset.name} - Home Base`, status: 'Phase one: Presentation',
+      adminIds: [me.uid], createdAt: serverTimestamp()
     });
     await setDoc(doc(db, 'rooms', ref.id), { active: false, currentSlide: 0, presentationId: null, updatedAt: serverTimestamp() });
     loadCases();
@@ -396,15 +471,19 @@ async function openAdminCase(caseId) {
         <option ${adminCase.status==='Phase two: Reflection'?'selected':''}>Phase two: Reflection</option>
         <option ${adminCase.status==='Complete'?'selected':''}>Complete</option>
       </select></div>
+    <div class="field" style="max-width:460px;margin-top:14px"><label>Case team - admins on this case</label>
+      <div class="teamline" id="teamLine"><span class="note">Loading team...</span></div>
+      <div style="display:flex;gap:8px"><input id="teamEmail" type="email" placeholder="Admin's email" style="flex:1"><button class="ghost" id="teamAdd">Add admin</button></div>
+      <div class="note" id="teamNote"></div></div>
     <div class="tabs" id="acTabs">
       <button data-tab="reflection">Reflection</button>
       <button data-tab="presentation">Presentation</button>
-      <button data-tab="files">Files</button>
+      <button data-tab="materials">Materials</button>
       <button data-tab="slides">Slides & live</button>
     </div>
     <div id="ac-reflection"></div>
     <div id="ac-presentation" class="hidden"></div>
-    <div id="ac-files" class="hidden"></div>
+    <div id="ac-materials" class="hidden"></div>
     <div id="ac-slides" class="hidden"></div>
     <div style="margin-top:26px"><button class="ghost" id="backToCases">&larr; All cases</button></div>`;
   $('caseStatus').onchange = async e => { await updateDoc(doc(db,'cases',caseId), { status: e.target.value }); };
@@ -413,12 +492,44 @@ async function openAdminCase(caseId) {
   $('acTabs').onclick = e => {
     if (!e.target.dataset.tab) return;
     document.querySelectorAll('#acTabs button').forEach(b => b.classList.toggle('on', b===e.target));
-    ['reflection','presentation','files','slides'].forEach(t => $(`ac-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
+    ['reflection','presentation','materials','slides'].forEach(t => $(`ac-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
   };
   renderChat($('ac-reflection'), caseId, 'reflection', true);
   renderChat($('ac-presentation'), caseId, 'presentation', true);
-  renderFiles($('ac-files'), caseId, true);
+  renderMaterials($('ac-materials'), caseId, true);
+  renderTeam(caseId);
   renderSlidesAdmin($('ac-slides'), adminCase.clientId, caseId);
+}
+
+/* ---------- case team (multi-admin per case) ---------- */
+async function renderTeam(caseId) {
+  const line = $('teamLine'); if (!line) return;
+  const ids = adminCase.adminIds || [];
+  const profiles = await Promise.all(ids.map(async id => {
+    const d = await getDoc(doc(db, 'users', id));
+    return d.exists() ? { id, ...d.data() } : { id, name: 'Former admin', email: '' };
+  }));
+  line.innerHTML = profiles.map(p => `<span class="teamchip">${esc(p.name||p.email)}${p.id===me.uid?' (you)':''}
+    ${profiles.length>1 ? `<button data-rm="${p.id}" title="Remove from case">&times;</button>` : ''}</span>`).join('');
+  line.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
+    if (b.dataset.rm === me.uid) { $('teamNote').textContent = 'Ask another admin on the case to remove you.'; return; }
+    adminCase.adminIds = adminCase.adminIds.filter(id => id !== b.dataset.rm);
+    await updateDoc(doc(db, 'cases', caseId), { adminIds: adminCase.adminIds });
+    renderTeam(caseId);
+  });
+  $('teamAdd').onclick = async () => {
+    const email = $('teamEmail').value.trim().toLowerCase(); if (!email) return;
+    $('teamNote').textContent = '';
+    const hit = await getDocs(query(collection(db, 'users'), where('email','==',email)));
+    if (hit.empty) { $('teamNote').textContent = 'No profile with that email yet - they sign up first, then you add them.'; return; }
+    const u = { id: hit.docs[0].id, ...hit.docs[0].data() };
+    if (u.role !== 'admin') { $('teamNote').textContent = 'That profile is a client, not an admin.'; return; }
+    if ((adminCase.adminIds||[]).includes(u.id)) { $('teamNote').textContent = 'Already on this case.'; return; }
+    adminCase.adminIds = [...(adminCase.adminIds||[]), u.id];
+    await updateDoc(doc(db, 'cases', caseId), { adminIds: adminCase.adminIds });
+    $('teamEmail').value = '';
+    renderTeam(caseId);
+  };
 }
 
 /* ---------- slides + live control (admin) ---------- */
