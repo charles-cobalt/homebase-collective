@@ -79,6 +79,8 @@ main{max-width:880px;margin:0 auto;padding:34px 22px 90px}
 .tabs button:hover{background:none;color:var(--coffee)}
 
 /* chat */
+body.reflect{background:#fbfaf7}
+body.night.reflect{background:#1a1411}
 .chatlog{display:flex;flex-direction:column;gap:14px;padding:6px 0 20px;min-height:120px}
 .row .t{flex:1 1 140px;min-width:0}
 .row .t,.row .s,h1,h2{overflow-wrap:break-word}
@@ -309,7 +311,7 @@ onAuthStateChanged(auth, async user => {
   unsub.forEach(u => u()); unsub = [];
   me = user;
   ['auth','client','admin'].forEach(hide);
-  if (!user) { show('auth'); hide('gearBtn'); hide('gearMenu'); return; }
+  if (!user) { document.body.classList.remove('reflect'); show('auth'); hide('gearBtn'); hide('gearMenu'); return; }
   myProfile = (await getDoc(doc(db, 'users', user.uid))).data() || { name: user.email, role: 'client' };
   $('gmName').textContent = myProfile.name || '';
   $('gmEmail').textContent = user.email || '';
@@ -479,6 +481,7 @@ function renderClientCase() {
 }
 function startClient() {
   show('client');
+  document.body.classList.add('reflect');
   $('clientTitle').textContent = 'Finding your space...';
   unsub.push(onSnapshot(query(collection(db, 'cases'), where('clientId','==',me.uid)), snap => {
     if (snap.empty) {
@@ -511,6 +514,7 @@ function startClient() {
   $('clientTabs').onclick = e => {
     if (!e.target.dataset.tab) return;
     document.querySelectorAll('#clientTabs button').forEach(b => b.classList.toggle('on', b===e.target));
+    document.body.classList.toggle('reflect', e.target.dataset.tab==='reflection');
     ['reflection','materials'].forEach(t => $(`ctab-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
   };
 }
@@ -584,6 +588,7 @@ $('leaveStage').onclick = () => { stopStageVideo(); hide('stageView'); };
 let adminCase = null;
 function startAdmin() {
   show('admin');
+  document.body.classList.remove('reflect');
   loadCases();
 }
 async function loadCases() {
@@ -618,6 +623,7 @@ document.querySelector('#adminTabs [data-tab="cases"]').onclick = () => {
   if ($('atab-case').classList.contains('hidden')) return;
   hide('atab-case'); hide('adminCaseTab'); show('atab-cases');
   document.querySelectorAll('#adminTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab==='cases'));
+  document.body.classList.remove('reflect');
   loadCases();
 };
 async function openAdminCase(caseId) {
@@ -626,6 +632,7 @@ async function openAdminCase(caseId) {
   show('adminCaseTab');
   document.querySelectorAll('#adminTabs button').forEach(b => b.classList.toggle('on', b.id==='adminCaseTab'));
   hide('atab-cases'); show('atab-case');
+  document.body.classList.add('reflect');
   const client = (await getDoc(doc(db, 'users', adminCase.clientId))).data();
   const el = $('atab-case');
   el.innerHTML = `
@@ -662,7 +669,7 @@ async function openAdminCase(caseId) {
         <button class="ghost" data-casedelyes="1">Yes, delete it</button> <button class="ghost" id="caseDelNo">Keep it</button></div></div>
     <div style="margin-top:26px"><button class="ghost" id="backToCases">&larr; All cases</button></div>`;
   $('caseStatus').onchange = async e => { await updateDoc(doc(db,'cases',caseId), { status: e.target.value }); };
-  $('backToCases').onclick = () => { hide('atab-case'); hide('adminCaseTab'); show('atab-cases');
+  $('backToCases').onclick = () => { document.body.classList.remove('reflect'); hide('atab-case'); hide('adminCaseTab'); show('atab-cases');
     document.querySelectorAll('#adminTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab==='cases')); loadCases(); };
   $('caseDel').onclick = () => $('caseDelBox').classList.remove('hidden');
   $('caseDelNo').onclick = () => $('caseDelBox').classList.add('hidden');
@@ -693,6 +700,7 @@ async function openAdminCase(caseId) {
     if (adminCase.videoPoolId) { try { await updateDoc(doc(db, 'videoPool', adminCase.videoPoolId), { assigned: null, assignedAt: null }); } catch(e) {} }
     await deleteDoc(doc(db, 'rooms', caseId)).catch(()=>{});
     await deleteDoc(doc(db, 'cases', caseId));
+    document.body.classList.remove('reflect');
     hide('atab-case'); hide('adminCaseTab'); show('atab-cases');
     document.querySelectorAll('#adminTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab==='cases'));
     loadCases();
@@ -700,6 +708,7 @@ async function openAdminCase(caseId) {
   $('acTabs').onclick = e => {
     if (!e.target.dataset.tab) return;
     document.querySelectorAll('#acTabs button').forEach(b => b.classList.toggle('on', b===e.target));
+    document.body.classList.toggle('reflect', e.target.dataset.tab==='reflection');
     ['reflection','materials','slides','transform'].forEach(t => $(`ac-${t}`).classList.toggle('hidden', t!==e.target.dataset.tab));
   };
   renderChat($('ac-reflection'), caseId, 'reflection', true);
